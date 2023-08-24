@@ -79,7 +79,7 @@ namespace Wholesome
             SoleFlat = new Base.Offset
             {
                 Positon = new Vector3(0, 0.0751f, 0.0354f),
-                EulerAngles = new Vector3(60f, 0, 0),
+                EulerAngles = new Vector3(64.428f, 0, 0),
             },
             SoleHeeled = new Base.Offset
             {
