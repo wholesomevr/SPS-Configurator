@@ -571,8 +571,9 @@ namespace Wholesome
             {
                 state = state,
                 enableSelf = true,
-                maxDepth = 0.00f,
-                minDepth = -0.03f,
+                startDistance = 0.05f,
+                endDistance = 0,
+                smoothingSeconds = 0,
             });
         }
 
@@ -675,6 +676,7 @@ namespace Wholesome
                     {
                         var blendshape = toggles[socket.Info.Name].SelectedBlendshape;
                         AddBlendshape(socketVrcf, selectedMesh, blendshape); // TODO: Make it work for advanced
+                        socketVrcf.enableDepthAnimations = true;
                     }
                 }
             }
@@ -700,6 +702,7 @@ namespace Wholesome
 
                 var mouthBlendshape = toggles["Mouth"].SelectedBlendshape;
                 AddBlendshape(socketVrcfMouth, null, mouthBlendshape);
+                socketVrcfMouth.enableDepthAnimations = true;
                 if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
                 {
                     var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
