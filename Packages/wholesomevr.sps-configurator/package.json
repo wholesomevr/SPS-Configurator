@@ -5,7 +5,8 @@
   "description": "Describe this Package",
   "gitDependencies": {},
   "vpmDependencies": {
-    "com.vrchat.avatars": "3.2.3"
+    "com.vrchat.avatars": "3.2.3",
+    "com.vrcfury.vrcfury": "1.388.0"
   },
   "author": {
     "name": "wholesomevr",
