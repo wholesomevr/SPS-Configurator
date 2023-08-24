@@ -1,7 +1,7 @@
 name: Build Repo Listing
 
 env:
-  CurrentPackageName: com.vrchat.demo-template
+  CurrentPackageName: wholesomevr.sps-configurator
   listPublishDirectory: Website
   pathToCi: ci
   

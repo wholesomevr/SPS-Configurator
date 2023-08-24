@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  packageName: "com.vrchat.demo-template"
+  packageName: "wholesomevr.sps-configurator"
 
 permissions:
   contents: write
