@@ -249,16 +249,17 @@ namespace Wholesome
                 {
                     if (info.Both)
                     {
+                        
                         return new[]
                         {
-                            $"{info.DisplayName} Left", $"{info.DisplayName} Right",
+                            $"{info.DisplayName} Left", $"{info.DisplayName} Right", $"Double {info.DisplayName}",
                         };
                     }
                     else
                     {
                         return new[]
                         {
-                            $"{info.DisplayName} Left", $"{info.DisplayName} Right", $"Double {info.DisplayName}",
+                            $"{info.DisplayName} Left", $"{info.DisplayName} Right",
                         };
                     }
                 }
@@ -277,14 +278,13 @@ namespace Wholesome
                 if (socket != null)
                 {
                     var parent = socket.transform.parent;
-                    if (socket.transform.parent.name == "SPS" && socketNames.Contains(socket.name))
+                    if (parent.name == "SPS" && socketNames.Contains(socket.name))
                     {
-                        
-                    }
-                    Object.DestroyImmediate(socket.gameObject);
-                    if (parent.childCount == 0)
-                    {
-                        Object.DestroyImmediate(parent.gameObject);
+                        Object.DestroyImmediate(socket.gameObject);
+                        if (parent.childCount == 0)
+                        {
+                            Object.DestroyImmediate(parent.gameObject);
+                        }
                     }
                 }
             }
