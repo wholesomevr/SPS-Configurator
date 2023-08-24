@@ -271,6 +271,7 @@ namespace Wholesome
                     };
                 }
             }).ToList();
+            socketNames.Add("Mouth");
             var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
             
             foreach (var socket in sockets)
@@ -680,14 +681,22 @@ namespace Wholesome
 
             // TODO: Refactor??
 
-            if (toggles["Mouth"].On)
+            if (toggles["Mouth"].On && categoryToggles[Base.Category.Default])
             {
                 var gameObjectMouth = new GameObject("Mouth");
                 var socketVrcfMouth = gameObjectMouth.AddComponent<VRCFuryHapticSocket>();
                 socketVrcfMouth.addLight = VRCFuryHapticSocket.AddLight.Hole;
                 socketVrcfMouth.name = "Mouth";
                 var boneTransformMouth = humanToTransform["Head"];
-                gameObjectMouth.transform.SetParent(boneTransformMouth, false);
+                var sps = boneTransformMouth.Find("SPS")?.gameObject;
+                if (sps == null)
+                {
+                    sps = new GameObject("SPS");
+                    sps.transform.SetParent(boneTransformMouth, false);
+                }
+                sps.transform.localPosition = Vector3.zero;
+                sps.transform.localEulerAngles = Vector3.zero;
+                gameObjectMouth.transform.SetParent(sps.transform, false);
 
                 var mouthBlendshape = toggles["Mouth"].SelectedBlendshape;
                 AddBlendshape(socketVrcfMouth, null, mouthBlendshape);
