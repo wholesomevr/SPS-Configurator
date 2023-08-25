@@ -60,7 +60,53 @@ namespace Wholesome
         public static Base ImLeXz = new Base
         {
             Name = "ImLeXz",
-            DefaultHipLength = 0.0807063f,
+            Hand = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.057f, -0.0254f),
+                EulerAngles = new Vector3(0, -90, 0)
+            },
+            Pussy = new Base.Offset
+            {
+                Positon = new Vector3(0, -0.0891f, -0.00446f),
+                EulerAngles = new Vector3(90, 0, 0)
+            },
+            Anal = new Base.Offset
+            {
+                Positon = new Vector3(0, -0.083f, -0.0299f),
+                EulerAngles = new Vector3(100.454f, 0, 0)
+            },
+            Titjob = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.0603f, 0.0937f),
+                EulerAngles = new Vector3(90f, 0, 0),
+            },
+            Assjob = new Base.Offset
+            {
+                Positon = new Vector3(0, -0.0449f, -0.0968f),
+                EulerAngles = new Vector3(90, 0, 0),
+            },
+            Thighjob = new Base.Offset(new Vector3(0, 0.0995f, 0), new Vector3()),
+            SoleFlat = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.0933f, 0.0435f),
+                EulerAngles = new Vector3(72.415f, 0, 0),
+            },
+            SoleHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.0933f, 0.0435f),
+                EulerAngles = new Vector3(72.415f, 0, 0),
+            },
+            FootjobFlat = new Base.Offset
+            {
+                Positon = new Vector3(-0.0331f, 0.0474f, 0.0117f),
+                EulerAngles = new Vector3(-17.653f, 2.02f, -1.671f),
+            },
+            FootjobHeeled = new Base.Offset
+            {
+                Positon = new Vector3(-0.0331f, 0.0474f, 0.0117f),
+                EulerAngles = new Vector3(-17.653f, 2.02f, -1.671f),
+            },
+            DefaultHipLength = 0.1005178f,
         };
         
         public static Base Panda = new Base
