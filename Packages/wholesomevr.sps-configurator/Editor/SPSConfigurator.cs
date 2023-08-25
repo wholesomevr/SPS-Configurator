@@ -459,6 +459,7 @@ namespace Wholesome
         {
             var gameObject = new GameObject(name);
             var socketVrcf = gameObject.AddComponent<VRCFuryHapticSocket>();
+            socketVrcf.Version = 7;
             switch (socket.Info.Type)
             {
                 case Base.SocketType.Hole:
@@ -687,6 +688,7 @@ namespace Wholesome
             {
                 var gameObjectMouth = new GameObject("Mouth");
                 var socketVrcfMouth = gameObjectMouth.AddComponent<VRCFuryHapticSocket>();
+                socketVrcfMouth.Version = 7;
                 socketVrcfMouth.addLight = VRCFuryHapticSocket.AddLight.Hole;
                 socketVrcfMouth.name = "Mouth";
                 var boneTransformMouth = humanToTransform["Head"];
