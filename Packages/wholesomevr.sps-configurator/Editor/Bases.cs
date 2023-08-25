@@ -182,35 +182,45 @@ namespace Wholesome
             Name = "Zin RP",
             Hand = new Base.Offset
             {
-                Positon = new Vector3(0, 0.0472f, -0.0244f),
-                EulerAngles = new Vector3(0, 90, 0)
+                Positon = new Vector3(0, 0.0432f, -0.0284f),
+                EulerAngles = new Vector3(0, -90, 0)
             },
             Pussy = new Base.Offset
             {
-                Positon = new Vector3(0, -0.072f, -0.012f),
+                Positon = new Vector3(0, -0.07113f, -0.012f),
                 EulerAngles = new Vector3(90, 0, 0)
             },
             Anal = new Base.Offset
             {
-                Positon = new Vector3(0, -0.054f, -0.04f),
-                EulerAngles = new Vector3(135, 0, 0)
+                Positon = new Vector3(0, -0.0582f, -0.0497f),
+                EulerAngles = new Vector3(116.692f, 0, 0)
             },
             Titjob = new Base.Offset
             {
-                Positon = new Vector3(),
-                EulerAngles = new Vector3(),
+                Positon = new Vector3(0, 0.064f, 0.0996f),
+                EulerAngles = new Vector3(84.929f, 0, 0),
             },
             Assjob = new Base.Offset
             {
-                Positon = new Vector3(),
-                EulerAngles = new Vector3(),
+                Positon = new Vector3(0, -0.0379f, -0.1005f),
+                EulerAngles = new Vector3(90, 0, 0),
             },
+            Thighjob = new Base.Offset(new Vector3(0, 0.0995f, 0), new Vector3()),
             SoleFlat = new Base.Offset
             {
-                Positon = new Vector3(0, 0.0751f, 0.0354f),
-                EulerAngles = new Vector3(60f, 0, 0),
+                Positon = new Vector3(0, 0.08f, 0.0421f),
+                EulerAngles = new Vector3(54.025f, 0, 0),
             },
-            PussyBlendshape = "Coochy Open"
+            SoleHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.1388f, 0.0117f),
+                EulerAngles = new Vector3(16.739f, 0, 0),
+            },
+            FootjobFlat = new Base.Offset(new Vector3(0, 0.0674f, 0.0083f), new Vector3(-31f, 0, 0)),
+            FootjobHeeled = new Base.Offset(new Vector3(0, 0.0674f, 0.0083f), new Vector3(-15f, 0, 0)),
+            PussyBlendshape = "Coochy Open",
+            AnalBlendshape = "Butt Hole Open",
+            DefaultHipLength = 0.0810318f
         };
 
         public static readonly Base[] All = { Generic, Panda, ImLeXz, ToriBase, ZinFit, ZinRP };
