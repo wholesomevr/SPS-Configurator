@@ -53,6 +53,8 @@ jobs:
         run: |
           release_url=$(gh release view --json assets -q .assets.[0].url -R VRCFury/VRCFury)
           echo "RELEASE_URL=$release_url" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Build Package Version Listing
         run: ${{env.pathToCi}}/build.cmd BuildRepoListing --root ${{env.pathToCi}} --list-publish-directory $GITHUB_WORKSPACE/${{env.listPublishDirectory}} --current-package-name ${{env.CurrentPackageName}} --add-package-id com.vrcfury.vrcfury --add package-url $VRCFURY_URL 
         env:
