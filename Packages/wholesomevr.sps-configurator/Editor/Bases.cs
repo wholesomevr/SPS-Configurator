@@ -11,7 +11,7 @@ namespace Wholesome
             Hand = new Base.Offset
             {
                 Positon = new Vector3(0, 0.0472f, -0.0244f),
-                EulerAngles = new Vector3(0, 90, 0)
+                EulerAngles = new Vector3(0, -90, 0)
             },
             Pussy = new Base.Offset
             {
@@ -25,18 +25,34 @@ namespace Wholesome
             },
             Titjob = new Base.Offset
             {
-                Positon = new Vector3(),
-                EulerAngles = new Vector3(),
+                Positon = new Vector3(0, 0.0719f, 0.1095f),
+                EulerAngles = new Vector3(86.89201f, 0, 0),
             },
             Assjob = new Base.Offset
             {
-                Positon = new Vector3(),
-                EulerAngles = new Vector3(),
+                Positon = new Vector3(0, -0.0566f, -0.1204f),
+                EulerAngles = new Vector3(90, 0, 0),
             },
+            Thighjob = new Base.Offset(new Vector3(0, 0.0995f, 0), new Vector3()),
             SoleFlat = new Base.Offset
             {
                 Positon = new Vector3(0, 0.0751f, 0.0354f),
-                EulerAngles = new Vector3(60f, 0, 0),
+                EulerAngles = new Vector3(64.428f, 0, 0),
+            },
+            SoleHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.134f, 0.0222f),
+                EulerAngles = new Vector3(37.841f, 0, 0),
+            },
+            FootjobFlat = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.0346f, 0.0181f),
+                EulerAngles = new Vector3(-25.567f, 0, 0),
+            },
+            FootjobHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0, 0.0582f, 0.0059f),
+                EulerAngles = new Vector3(),
             },
             DefaultHipLength = 0.0807063f
         };
@@ -102,13 +118,16 @@ namespace Wholesome
         public static Base ToriBase = new Base
         {
             Name = "Tori Base",
-            Hand = new Base.Offset(new Vector3(-0.0136f, 0.0537f, -0.0272f), new Vector3(0, -65.05901f, 0)),
+            Hand = new Base.Offset(new Vector3(0, 0.0644f, -0.0307f), new Vector3(0, -90f, 0)),
             Pussy = new Base.Offset(new Vector3(0, -0.127297f, -0.01245906f), new Vector3(90, 0, 0)),
             Anal = new Base.Offset(new Vector3(0, -0.100751f, -0.05263702f), new Vector3(126.387f,0, 0)),
             Titjob = new Base.Offset(new Vector3(0, 0.0069f, 0.1068f), new Vector3(76.802f, 0, 0)),
             Assjob = new Base.Offset(new Vector3(0, -0.0926f, -0.0978f), new Vector3(90, 0, 0)),
+            Thighjob = new Base.Offset(new Vector3(0, 0.0996f, 0), new Vector3()),
             SoleFlat = new Base.Offset(new Vector3(0, 0.0713f, 0.0586f), new Vector3(70.57101f, 0, 0)),
             SoleHeeled = new Base.Offset(new Vector3(0, 0.0933f, 0.1213f), new Vector3(70.57101f, 0, 0)),
+            FootjobFlat = new Base.Offset(new Vector3(0, 0.0523f, 0.0238f), new Vector3(-20.642f, 0, 0)),
+            FootjobHeeled = new Base.Offset(new Vector3(0, 0.03769f, 0.03854f), new Vector3(44.667f, 0, 0)),
             PussyBlendshape = "PUSSY_open",
             AnalBlendshape = "BUTTHOLE_open",
             DefaultHipLength = 0.102655f
