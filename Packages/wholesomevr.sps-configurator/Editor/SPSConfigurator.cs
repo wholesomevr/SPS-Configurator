@@ -124,7 +124,7 @@ namespace Wholesome
             }
             logo = Resources.Load<Texture2D>("SPS Logo");
             categoryLabelBackground = new Texture2D(1, 1);
-            categoryLabelBackground.SetPixel(0, 0, new Color(0.5f, 0.5f, 0.5f));
+            categoryLabelBackground.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.2f));
             //GuessBase();
         }
 
