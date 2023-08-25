@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v3 # check out this repo
       - uses: actions/checkout@v3 # check out automation repo
         with:
-          repository: vrchat-community/package-list-action
+          repository: wholesomevr/package-list-action
           path: ${{env.pathToCi}}
           clean: false # otherwise the local repo will no longer be checked out
           
@@ -49,11 +49,15 @@ jobs:
             ${{env.pathToCi}}/.nuke/temp
             ~/.nuget/packages
           key: ${{ runner.os }}-${{ hashFiles('**/global.json', '**/*.csproj') }}
-          
+      - id: vrcf
+        run: |
+          release_url=$(gh release view --json assets -q .assets.[0].url -R VRCFury/VRCFury)
+          echo "RELEASE_URL=$release_url" >> "$GITHUB_OUTPUT"
       - name: Build Package Version Listing
-        run: ${{env.pathToCi}}/build.cmd BuildRepoListing --root ${{env.pathToCi}} --list-publish-directory $GITHUB_WORKSPACE/${{env.listPublishDirectory}} --current-package-name ${{env.CurrentPackageName}}
+        run: ${{env.pathToCi}}/build.cmd BuildRepoListing --root ${{env.pathToCi}} --list-publish-directory $GITHUB_WORKSPACE/${{env.listPublishDirectory}} --current-package-name ${{env.CurrentPackageName}} --add-package-id com.vrcfury.vrcfury --add package-url $VRCFURY_URL 
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VRCFURY_URL: ${{ steps.vrcf.outputs.RELEASE_URL }}
  
       - name: Setup Pages
         uses: actions/configure-pages@v3
