@@ -274,7 +274,7 @@ namespace Wholesome
                     };
                 }
             }).ToList();
-            socketNames.Add("Mouth");
+            socketNames.Add("Blowjob");
             var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
             
             foreach (var socket in sockets)
@@ -689,11 +689,11 @@ namespace Wholesome
 
             if (toggles["Mouth"].On && categoryToggles[Base.Category.Default])
             {
-                var gameObjectMouth = new GameObject("Mouth");
+                var gameObjectMouth = new GameObject("Blowjob");
                 var socketVrcfMouth = gameObjectMouth.AddComponent<VRCFuryHapticSocket>();
                 socketVrcfMouth.Version = 7;
                 socketVrcfMouth.addLight = VRCFuryHapticSocket.AddLight.Hole;
-                socketVrcfMouth.name = "Mouth";
+                socketVrcfMouth.name = "Blowjob";
                 var boneTransformMouth = humanToTransform["Head"];
                 var sps = boneTransformMouth.Find("SPS")?.gameObject;
                 if (sps == null)
