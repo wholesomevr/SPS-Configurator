@@ -64,7 +64,8 @@ namespace Wholesome
             var weightedPos = mesh.vertices.Zip(weights, (pos, weight) => pos * weight)
                 .Aggregate(new Vector3(), (wpSum, wp) => wpSum + wp, (wp) => wp);
             Debug.Assert(Mathf.Abs(weightedPos.x) < 0.01, "Blendshape not symmetric");
-            weightedPos = new Vector3(0, weightedPos.z, -weightedPos.y); // TODO: Handle all possible head transformations
+            weightedPos = head.localToWorldMatrix.MultiplyPoint(weightedPos);
+            //weightedPos = new Vector3(0, weightedPos.z, -weightedPos.y); // TODO: Handle all possible head transformations
             return weightedPos;
         }
 
