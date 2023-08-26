@@ -217,12 +217,6 @@ namespace Wholesome
                         selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault();
                     }
                 }
-
-                if (selectedAvatar == null)
-                {
-                    selectedAvatar = Object.FindObjectsOfType<VRCAvatarDescriptor>().FirstOrDefault();
-                }
-
                 return selectedAvatar;
             }
         }
