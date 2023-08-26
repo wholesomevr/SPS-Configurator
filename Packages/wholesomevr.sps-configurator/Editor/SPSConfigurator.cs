@@ -322,7 +322,7 @@ namespace Wholesome
 
             public virtual void Draw(SkinnedMeshRenderer[] meshes)
             {
-                On = EditorGUILayout.ToggleLeft(_name, On, GUILayout.ExpandWidth(false));
+                On = EditorGUILayout.ToggleLeft(_name, On);
             }
         }
 
@@ -869,11 +869,23 @@ namespace Wholesome
                 togglesStyle.padding = new RectOffset(8, 8, 8, 8);
                 using (new EditorGUILayout.HorizontalScope(togglesStyle))
                 {
+
                     //EditorGUILayout.Space(16);
                     using (new EditorGUILayout.VerticalScope())
                     {
                         if (category == Base.Category.Default)
                         {
+                            EditorGUILayout.BeginHorizontal();
+                            var toggleLabelStyle = new GUIStyle(GUI.skin.label);
+                            toggleLabelStyle.margin = new RectOffset(2, 4, 0, 8);
+                            toggleLabelStyle.normal.textColor = Color.gray;
+                            GUILayout.Label("Toggle", toggleLabelStyle);
+                            GUILayout.FlexibleSpace();
+                            var blendshapeLabelStyle = new GUIStyle(GUI.skin.label);
+                            blendshapeLabelStyle.margin = new RectOffset(4, 16, 0, 8);
+                            blendshapeLabelStyle.normal.textColor = Color.gray;
+                            GUILayout.Label("Blendshape/Symmetric Toggles", blendshapeLabelStyle);
+                            EditorGUILayout.EndHorizontal();                            
                             toggles["Mouth"].Draw(meshes);
                         }
                         foreach (var socket in Wholesome.Base.SocketsInCategory(category))
