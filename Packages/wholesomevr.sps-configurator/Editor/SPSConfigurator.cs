@@ -124,7 +124,8 @@ namespace Wholesome
             }
             logo = Resources.Load<Texture2D>("SPS Logo");
             categoryLabelBackground = new Texture2D(1, 1);
-            categoryLabelBackground.SetPixel(0, 0, new Color(0.2f, 0.2f, 0.2f));
+            categoryLabelBackground.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.3f));
+            categoryLabelBackground.Apply();
             //GuessBase();
         }
 
@@ -771,7 +772,8 @@ namespace Wholesome
                 labelStyle.fontStyle = FontStyle.Bold;
                 labelStyle.font = EditorStyles.boldLabel.font;
                 labelStyle.padding = new RectOffset(8, 8, 8, 8);
-                labelStyle.normal.background = categoryLabelBackground;
+                labelStyle.normal.background = labelStyle.normal.scaledBackgrounds[0];
+                labelStyle.normal.textColor = EditorStyles.boldLabel.normal.textColor;
                 var prefixStyle = new GUIStyle(GUI.skin.label);
                 prefixStyle.padding = new RectOffset(8, 8, 8, 8);
                 GUILayout.Label("Selected Avatar:", prefixStyle, GUILayout.ExpandWidth(false));
@@ -867,7 +869,7 @@ namespace Wholesome
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
             var style = new GUIStyle(GUI.skin.box);
-            style.normal.background = categoryLabelBackground;
+            style.normal.background = style.normal.scaledBackgrounds[0];
             EditorGUILayout.BeginHorizontal(style);
             categoryToggles[category] =
                 EditorGUILayout.ToggleLeft(category.ToString(), categoryToggles[category], EditorStyles.boldLabel);
