@@ -1,7 +1,7 @@
 {
   "name": "wholesomevr.sps-configurator",
   "displayName": "wholesome\u00a9 SPS Configurator",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Describe this Package",
   "gitDependencies": {},
   "vpmDependencies": {
