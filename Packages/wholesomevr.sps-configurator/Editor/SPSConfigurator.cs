@@ -738,6 +738,10 @@ namespace Wholesome
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.Space();
             EditorGUILayout.BeginVertical();
+            if (Resources.FindObjectsOfTypeAll<VRCAvatarDescriptor>().Length == 0)
+            {
+                EditorGUILayout.HelpBox("No Avatar with a VRC Avatar Descriptor found on the active scene.", MessageType.Warning);
+            }
             // selectedMode = (Mode)GUILayout.Toolbar((int)selectedMode, new[] { "Simple", "Advanced" });
             selectedMode = Mode.Advanced;
             var selectedAvatar = SelectedAvatar;
