@@ -714,8 +714,7 @@ namespace Wholesome
                     var mouthPosition = DetectMouthPosition(vrcAvatar.VisemeSkinnedMesh,
                         vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
                             visemOhBlendshapeName));
-                    gameObjectMouth.transform.position =
-                        Vector3.Scale(mouthPosition, inverseArmatureScale) * bakedScale;
+                    gameObjectMouth.transform.position = mouthPosition;
                 }
                 else
                 {
