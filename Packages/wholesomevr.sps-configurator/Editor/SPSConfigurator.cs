@@ -741,12 +741,6 @@ namespace Wholesome
             // selectedMode = (Mode)GUILayout.Toolbar((int)selectedMode, new[] { "Simple", "Advanced" });
             selectedMode = Mode.Advanced;
             var selectedAvatar = SelectedAvatar;
-            if (selectedAvatar == null)
-            {
-                EditorGUILayout.HelpBox("Select an Avatar in the Hierachy window or have one Avatar be activated.",
-                    MessageType.Info);
-                EditorGUILayout.Space();
-            }
 
             using (var scope = new EditorGUILayout.HorizontalScope())
             {
@@ -760,7 +754,7 @@ namespace Wholesome
                 }
                 else
                 {
-                    avatarLabel = "No Avatar selected. Select an Avatar in the Hierachy Window.";
+                    avatarLabel = "No Avatar selected. Select an Avatar in the Hierarchy Window.";
                 }
 
                 var labelStyle = new GUIStyle(GUI.skin.box);
