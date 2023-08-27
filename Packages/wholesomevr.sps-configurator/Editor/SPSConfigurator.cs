@@ -42,7 +42,7 @@ namespace Wholesome
         {
             var window = GetWindow(typeof(SPSConfigurator));
             window.titleContent = new GUIContent("SPS Configurator");
-            window.minSize = new Vector2(490, 530);
+            window.minSize = new Vector2(490, 600);
             window.Show();
         }
 
@@ -723,7 +723,23 @@ namespace Wholesome
 
                 GUILayout.FlexibleSpace();
             }
-
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            var linkStyle = new GUIStyle(GUI.skin.button)
+            {
+                padding = new RectOffset(16, 16, 8, 8)
+            };
+            if (GUILayout.Button("Discord", linkStyle, GUILayout.ExpandWidth(false)))
+            {
+                Application.OpenURL("https://discord.gg/Rtp3wvJu8s");
+            }
+            if (GUILayout.Button("Gumroad", linkStyle, GUILayout.ExpandWidth(false)))
+            {
+                Application.OpenURL("https://wholesomevr.gumroad.com/?referrer=SPS");
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space();
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
             EditorGUILayout.EndHorizontal();
