@@ -26,6 +26,10 @@ namespace Wholesome
         private Dictionary<Base.Category, bool> categoryToggles;
         private Dictionary<string, Toggle> toggles;
 
+        private string[] autoOn = {
+            "Blowjob", "Handjob Right", "Handjob Left", "Pussy", "Steppies Right", "Steppies Left"
+        };
+
         private enum Mode
         {
             Simple = 0,
@@ -376,7 +380,7 @@ namespace Wholesome
         {
         }
 
-        public static VRCFuryHapticSocket CreateSocket(Base.Socket socket, string name, string boneName,
+        public VRCFuryHapticSocket CreateSocket(Base.Socket socket, string name, string boneName,
             Dictionary<string, Transform> armature,
             Vector3 inverseArmatureScale, List<MoveMenuItem> menuMoves, float bakedScale, bool alignBone = false)
         {
@@ -394,6 +398,7 @@ namespace Wholesome
             }
 
             socketVrcf.name = name;
+            socketVrcf.enableAuto = autoOn.Contains(name);
             var boneTransform = armature[boneName];
             var sps = boneTransform.Find("SPS")?.gameObject;
             if (sps == null)
