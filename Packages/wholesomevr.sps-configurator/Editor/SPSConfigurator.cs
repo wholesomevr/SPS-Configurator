@@ -4,14 +4,12 @@ using System.Collections.Immutable;
 using System.Linq;
 using UnityEngine;
 using UnityEditor;
-using UnityEditor.Animations;
 using UnityEngine.Animations;
 using VF.Component;
 using VF.Model;
 using VF.Model.Feature;
 using VF.Model.StateAction;
 using VRC.SDK3.Avatars.Components;
-using VRC.SDK3.Avatars.ScriptableObjects;
 using VRC.SDKBase;
 using Object = UnityEngine.Object;
 
@@ -20,11 +18,6 @@ namespace Wholesome
     public class SPSConfigurator : EditorWindow
     {
         private int selectedBase = 0;
-        private int selectedAvatar = -1;
-        private VRCAvatarDescriptor selectedVRCAvatar;
-        private SkinnedMeshRenderer selectedMesh;
-        private bool showDropdown = false;
-        private Mode selectedMode = Mode.Simple;
         private Base.FootType selectedFootType = Base.FootType.Flat;
         private Texture2D categoryLabelBackground;
 
@@ -68,30 +61,10 @@ namespace Wholesome
             //weightedPos = new Vector3(0, weightedPos.z, -weightedPos.y); // TODO: Handle all possible head transformations
             return weightedPos;
         }
-
-        public static void DetermineAxis(Dictionary<string, Transform> armature)
-        {
-            var hand = armature["Right Hand"];
-            var middleFinger = armature["Right Middle Proximal"];
-        }
-
-        public static void AlignZWithGlobalY()
-        {
-        }
+        
 
         private void OnEnable()
         {
-            /*
-            var avatars = FindObjectsOfType<VRCAvatarDescriptor>();
-            if (avatars.Length == 1)
-            {
-                selectedAvatar = 0;
-                var avatar = avatars[selectedAvatar];
-                var meshes = avatar.GetComponentsInChildren<SkinnedMeshRenderer>();
-                var rootMeshes = meshes
-                    .Where(mesh => mesh.transform.parent == avatar.transform).ToArray();
-                selectedMesh = GuessBodyMesh(rootMeshes);
-            }*/
 
             var enums = Enum.GetValues(typeof(Wholesome.Base.Category)) as Wholesome.Base.Category[];
             categoryToggles = enums.ToDictionary(category => category, category => true);
@@ -197,12 +170,7 @@ namespace Wholesome
             toggles["Pussy"].SelectedBlendshape = @base.PussyBlendshape;
             toggles["Anal"].SelectedBlendshape = @base.AnalBlendshape;
         }
-
-        public static int GetSelectedAvatarInScene(VRCAvatarDescriptor[] avatars, Transform[] selected)
-        {
-            return -1;
-        }
-
+        
         private VRCAvatarDescriptor SelectedAvatar
         {
             get
@@ -310,19 +278,17 @@ namespace Wholesome
             public bool Left = true;
             public bool Right = true;
             public bool Both = true;
-            public int SelectedMesh = -1;
             public string SelectedBlendshape = null;
-            public int Blend = 100;
-            protected string _name;
+            protected string Name;
 
             public Toggle(string name)
             {
-                _name = name;
+                Name = name;
             }
 
             public virtual void Draw(SkinnedMeshRenderer[] meshes)
             {
-                On = EditorGUILayout.ToggleLeft(_name, On);
+                On = EditorGUILayout.ToggleLeft(Name, On);
             }
         }
 
@@ -339,7 +305,7 @@ namespace Wholesome
             {
                 using (new GUILayout.HorizontalScope())
                 {
-                    On = EditorGUILayout.ToggleLeft(_name, On, GUILayout.Width(64 + 16));
+                    On = EditorGUILayout.ToggleLeft(Name, On, GUILayout.Width(64 + 16));
                     GUILayout.FlexibleSpace();
                     EditorGUILayout.BeginHorizontal();
                     using (new EditorGUI.DisabledScope(!On))
@@ -366,20 +332,7 @@ namespace Wholesome
             {
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    On = EditorGUILayout.ToggleLeft(_name, On, GUILayout.ExpandWidth(false));
-                    /*GUIContent content;
-                    if (SelectedMesh >= 0 && SelectedBlendshape >= 0)
-                    {
-                        var mesh = meshes[SelectedMesh];
-                        var meshName = mesh.name;
-                        var blendshapeName = mesh.sharedMesh.GetBlendShapeName(SelectedBlendshape);
-                        content = new GUIContent(
-                            $"{blendshapeName}");
-                    }
-                    else
-                    {
-                        content = new GUIContent("None");
-                    }*/
+                    On = EditorGUILayout.ToggleLeft(Name, On, GUILayout.ExpandWidth(false));
                     GUILayout.FlexibleSpace();
 
 
@@ -401,36 +354,9 @@ namespace Wholesome
                                         blendshapeNameObject => { SelectedBlendshape = blendshapeNameObject as string; }, blendshapeName);
                                 }
                             }
-
-                            
-                                /*menu.AddItem(new GUIContent($"None"),
-                                    SelectedMesh == -1 && SelectedBlendshape == -1, () =>
-                                    {
-                                        SelectedMesh = -1;
-                                        SelectedBlendshape = -1;
-                                    });
-                                for (int i = 0; i < meshes.Length; i++)
-                                {
-                                    for (int j = 0; j < meshes[i].sharedMesh.blendShapeCount; j++)
-                                    {
-                                        var isSelected = SelectedMesh == i && SelectedMesh == j;
-                                        var menuEntry = $"{meshes[i].name}/{meshes[i].sharedMesh.GetBlendShapeName(j)}";
-                                        menu.AddItem(new GUIContent(menuEntry),
-                                            isSelected,
-                                            indices =>
-                                            {
-                                                if (indices is Tuple<int, int> ind)
-                                                {
-                                                    SelectedMesh = ind.Item1;
-                                                    SelectedBlendshape = ind.Item2;
-                                                }
-                                            }, Tuple.Create(i, j));
-                                    }
-                                }*/
-                                menu.ShowAsContext();
+                            menu.ShowAsContext();
                         }
                     }
-                    //Blend = EditorGUILayout.IntSlider(Blend, 0, 100);
                 }
             }
         }
@@ -496,28 +422,6 @@ namespace Wholesome
                     Vector3.Scale(socket.Location.Positon, inverseArmatureScale) * bakedScale;
                 gameObject.transform.localEulerAngles = socket.Location.EulerAngles;
             }
-            /*
-            gameObject.transform.SetParent(sps.transform, false);
-            gameObject.transform.localPosition =
-                Vector3.Scale(socket.Location.Positon, inverseArmatureScale) * bakedScale;
-            gameObject.transform.localEulerAngles = socket.Location.EulerAngles;
-
-            if (alignBone)
-            {
-                var twist = new GameObject($"{boneTransform.name} Aligned");
-                twist.transform.SetParent(boneTransform, false);
-                var alignedX = Vector3.Cross(twist.transform.up, Vector3.up);
-                var sign = Mathf.Sign(Vector3.Dot(twist.transform.up, Vector3.right));
-                twist.transform.localEulerAngles =
-                    new Vector3(0, sign * Vector3.Angle(twist.transform.right, alignedX), 0);
-                gameObject.transform.SetParent(twist.transform, false);
-                gameObject.transform.localPosition =
-                    Vector3.Scale(socket.Location.Positon, inverseArmatureScale) * bakedScale;
-                gameObject.transform.localEulerAngles = sign * socket.Location.EulerAngles;
-                gameObject.transform.SetParent(boneTransform, true);
-                Object.DestroyImmediate(twist);
-            }
-            */
 
             if (socket.Info.Category != Base.Category.Default)
             {
@@ -673,7 +577,7 @@ namespace Wholesome
                     if (socket.Info.Blendshape)
                     {
                         var blendshape = toggles[socket.Info.Name].SelectedBlendshape;
-                        AddBlendshape(socketVrcf, selectedMesh, blendshape); // TODO: Make it work for advanced
+                        AddBlendshape(socketVrcf, null, blendshape);
                         socketVrcf.enableDepthAnimations = true;
                     }
                 }
@@ -742,15 +646,10 @@ namespace Wholesome
             {
                 EditorGUILayout.HelpBox("No Avatar with a VRC Avatar Descriptor found on the active scene.", MessageType.Warning);
             }
-            // selectedMode = (Mode)GUILayout.Toolbar((int)selectedMode, new[] { "Simple", "Advanced" });
-            selectedMode = Mode.Advanced;
             var selectedAvatar = SelectedAvatar;
 
             using (var scope = new EditorGUILayout.HorizontalScope())
             {
-                /*selectedVRCAvatar =
-                    EditorGUILayout.ObjectField(selectedVRCAvatar, typeof(VRCAvatarDescriptor)) as VRCAvatarDescriptor;*/
-
                 string avatarLabel;
                 if (selectedAvatar != null)
                 {
@@ -772,13 +671,10 @@ namespace Wholesome
                 GUILayout.Label("Selected Avatar:", prefixStyle, GUILayout.ExpandWidth(false));
                 GUILayout.Space(8);
                 GUILayout.Label(avatarLabel, labelStyle);
-                // EditorGUILayout.LabelField("Selected Avatar:", avatarLabel, GUILayout.ExpandWidth(true));
             }
 
             EditorGUILayout.Space(8);
 
-            // GUILayout.Label("Base:");
-            
             using (var check = new EditorGUI.ChangeCheckScope())
             {
                 selectedBase =
@@ -802,24 +698,13 @@ namespace Wholesome
             drawCategory(Base.Category.Feet, meshes);
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-            /*switch (selectedMode)
-            {
-                case Mode.Simple:
-                    drawSimple();
-                    break;
-                case Mode.Advanced:
-                    drawAdvanced();
-                    break;
-            }*/
 
             EditorGUILayout.Space(16);
 
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(selectedAvatar == null /*selectedMesh == null ||
-                                                   selectedMesh.transform.parent.GetComponent<VRCAvatarDescriptor>() ==
-                                                   null*/))
+                using (new EditorGUI.DisabledScope(selectedAvatar == null))
                 {
                     if (GUILayout.Button("Apply", GUILayout.Width(128), GUILayout.Height(32)))
                     {
@@ -837,25 +722,6 @@ namespace Wholesome
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
             EditorGUILayout.EndHorizontal();
-        }
-
-        private void drawSimple()
-        {
-            if (selectedMesh != null)
-            {
-                if (selectedMesh.transform.parent.GetComponent<VRCAvatarDescriptor>() ==
-                    null)
-                {
-                    EditorGUILayout.HelpBox("No Avatar Descriptor found.", MessageType.Error);
-                }
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("Body:", GUILayout.ExpandWidth(false), GUILayout.MaxWidth(64));
-                selectedMesh =
-                    EditorGUILayout.ObjectField(selectedMesh, typeof(SkinnedMeshRenderer)) as SkinnedMeshRenderer;
-            }
         }
 
         private void drawCategory(Base.Category category, SkinnedMeshRenderer[] meshes)
@@ -927,67 +793,6 @@ namespace Wholesome
 
             EditorGUILayout.EndVertical();
             //EditorGUILayout.Space(8);
-        }
-
-        private void drawAdvanced()
-        {
-            var meshes = selectedVRCAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
-            EditorGUILayout.BeginVertical();
-            drawCategory(Base.Category.Default, meshes);
-            EditorGUILayout.BeginHorizontal();
-            drawCategory(Base.Category.Special, meshes);
-            drawCategory(Base.Category.Feet, meshes);
-            EditorGUILayout.EndHorizontal();
-            EditorGUILayout.EndVertical();
-            /*foreach (var category in Wholesome.Base.Categories)
-            {
-                EditorGUILayout.BeginVertical(GUI.skin.box);
-                var style = new GUIStyle(GUI.skin.box);
-                style.normal.background = categoryLabelBackground;
-                EditorGUILayout.BeginHorizontal(style);
-                categoryToggles[category] =
-                    EditorGUILayout.ToggleLeft(category.ToString(), categoryToggles[category], EditorStyles.boldLabel);
-                EditorGUILayout.EndHorizontal();
-                using (new EditorGUI.DisabledScope(!categoryToggles[category]))
-                {
-                    var togglesStyle = new GUIStyle(GUI.skin.label);
-                    togglesStyle.padding = new RectOffset(8, 8, 8, 8);
-                    using (new EditorGUILayout.HorizontalScope(togglesStyle))
-                    {
-                        //EditorGUILayout.Space(16);
-                        using (new EditorGUILayout.VerticalScope())
-                        {
-                            foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                            {
-                                toggles[socket.Name].Draw(meshes);
-                            }
-                            using (new EditorGUILayout.HorizontalScope())
-                            {
-                                if (GUILayout.Button("Select All"))
-                                {
-                                    foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                                    {
-                                        toggles[socket.Name].On = true;
-                                    }
-                                }
-
-                                if (GUILayout.Button("Deselect All"))
-                                {
-                                    foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                                    {
-                                        toggles[socket.Name].On = false;
-                                    }
-                                }
-                            }
-                        }
-                        //EditorGUILayout.Space(16);
-                    }
-                }
-
-                EditorGUILayout.EndVertical();
-                EditorGUILayout.Space(8);
-            }
-            */
         }
     }
 }
