@@ -632,7 +632,7 @@ namespace Wholesome
             vrcFury.config.features.Add(new MoveMenuItem
             {
                 fromPath = "Sockets",
-                toPath = "NSFW/SPS"
+                toPath = "SPS"
             });
         }
 
