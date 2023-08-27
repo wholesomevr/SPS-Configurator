@@ -154,6 +154,12 @@
         "com.unity.nuget.newtonsoft-json": "3.0.2"
       }
     },
+    "vrchat.blackstartx.gesture-manager": {
+      "version": "file:vrchat.blackstartx.gesture-manager",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "wholesomevr.sps-configurator": {
       "version": "file:wholesomevr.sps-configurator",
       "depth": 0,
