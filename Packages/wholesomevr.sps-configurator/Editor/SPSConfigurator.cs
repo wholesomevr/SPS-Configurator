@@ -12,6 +12,7 @@ using VF.Model.StateAction;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
 using Object = UnityEngine.Object;
+using Vector3 = UnityEngine.Vector3;
 
 namespace Wholesome
 {
@@ -725,11 +726,42 @@ namespace Wholesome
             }
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
-            GUILayout.FlexibleSpace();
             var linkStyle = new GUIStyle(GUI.skin.button)
             {
                 padding = new RectOffset(16, 16, 8, 8)
             };
+            using (new EditorGUI.DisabledScope(selectedAvatar == null))
+            {
+                if (GUILayout.Button("Add test penetrator to Avatar", linkStyle, GUILayout.ExpandWidth(false)))
+                {
+                    var testPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                        "Packages/wholesomevr.sps-configurator/Assets/Actual Wholesome Lollipop.prefab");
+                    var initiatedPrefab = PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
+                    var animator = selectedAvatar.gameObject.GetComponent<Animator>();
+                    Debug.Assert(animator != null, "No animator on the avatar");
+                    var unityAvatar = animator.avatar;
+                    var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
+                        .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
+                        .ToArray();
+                    var humanToTransform = BuildSkeleton(avatarMeshes, unityAvatar.humanDescription.human);
+                    if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                    {
+                        var visemOhBlendshapeName = SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
+                        var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
+                            SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                visemOhBlendshapeName));
+                        var position = mouthPosition + new Vector3(0, 0, 0.3f);
+                        initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                    }
+                    else
+                    {
+                        var mouthPosition = humanToTransform["Head"].transform.TransformPoint(new Vector3(0, 0.01f, 0.075f));
+                        var position = mouthPosition + new Vector3(0, 0, 0.3f);
+                        initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                    }
+                }
+            }
+            GUILayout.FlexibleSpace();
             if (GUILayout.Button("Discord", linkStyle, GUILayout.ExpandWidth(false)))
             {
                 Application.OpenURL("https://discord.gg/Rtp3wvJu8s");
