@@ -8,11 +8,14 @@
     },
     "vrchat.blackstartx.gesture-manager": {
       "version": "3.8.5"
+    },
+    "com.poiyomi.toon": {
+      "version": "8.1.167"
     }
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.403.0",
+      "version": "1.409.0",
       "dependencies": {}
     },
     "com.vrchat.avatars": {
@@ -30,6 +33,10 @@
       "dependencies": {
         "com.vrchat.avatars": "3.2.x"
       }
+    },
+    "com.poiyomi.toon": {
+      "version": "8.1.167",
+      "dependencies": {}
     }
   }
 }
