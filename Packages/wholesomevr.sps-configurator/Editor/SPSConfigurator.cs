@@ -534,15 +534,22 @@ namespace Wholesome
 
                 if (socket.Info.Symmetric)
                 {
+                    var toggle = toggles[socket.Info.Name];
                     var align = socket.Info.Bone == Base.Bone.Hand;
+                        
                     var socketVrcfLeft = CreateSocket(socket, $"{socket.Info.DisplayName} Left",
-                        $"Left{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
+                            $"Left{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
+
                     var socketVrcfRight = CreateSocket(socket, $"{socket.Info.DisplayName} Right",
-                        $"Right{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
-                    if (socket.Info.Both)
+                            $"Right{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
+                    if (socket.Info.Both && toggle.Both)
                     {
-                        var socketVrcf = CreateSocket(socket, $"Double {socket.Info.DisplayName}", "Hips",
+                        var name = $"Double {socket.Info.DisplayName}";
+                        var socketVrcf = CreateSocket(socket, name, "Hips",
                             humanToTransform, inverseArmatureScale, menuMoves, bakedScale);
+                        var bothLeftTarget = new GameObject($"{name} Left Target");
+                        bothLeftTarget.transform.SetParent(humanToTransform[Base.BoneName(socket.Info.Bone, Base.Direction.Left)], false);
+                        bothLeftTarget.transform.localPosition = socket.Location.Positon ;
                         var parent = socketVrcf.gameObject.AddComponent<ParentConstraint>();
                         parent.AddSource(new ConstraintSource
                         {
@@ -556,6 +563,16 @@ namespace Wholesome
                         });
                         parent.locked = true;
                         parent.constraintActive = true;
+                    }
+
+                    if (!toggle.Left)
+                    {
+                        Object.DestroyImmediate(socketVrcfLeft);
+                    }
+
+                    if (!toggle.Right)
+                    {
+                        Object.DestroyImmediate(socketVrcfRight);
                     }
                 }
                 else if (socket.Info.Parent)
