@@ -51,6 +51,7 @@ namespace Wholesome
         [Blendshape("Anal")] public string AnalBlendshape;
 
         public float DefaultHipLength;
+        public float DefaultTorsoLength;
 
         public struct Offset
         {

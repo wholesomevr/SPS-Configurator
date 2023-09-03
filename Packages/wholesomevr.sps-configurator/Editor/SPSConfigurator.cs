@@ -519,6 +519,11 @@ namespace Wholesome
                 1 / armatureScale.z);
             var hipLength = (humanToTransform["Spine"].position - humanToTransform["Hips"].position).magnitude;
             var bakedScale = hipLength/@base.DefaultHipLength;
+            if (selectedBase == 0) // Generic
+            {
+                var torsoLength = (humanToTransform["Neck"].position - humanToTransform["Hips"].position).magnitude;
+                bakedScale = torsoLength / @base.DefaultTorsoLength;
+            }
             var menuMoves = new List<MoveMenuItem>();
             foreach (var socket in @base.GetSocketsForFootType(selectedFootType))
             {

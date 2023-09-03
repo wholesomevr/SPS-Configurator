@@ -54,7 +54,7 @@ namespace Wholesome
                 Positon = new Vector3(0, 0.0582f, 0.0059f),
                 EulerAngles = new Vector3(),
             },
-            DefaultHipLength = 0.0807063f
+            DefaultTorsoLength = 0.3600037f
         };
         
         public static Base ImLeXz = new Base
