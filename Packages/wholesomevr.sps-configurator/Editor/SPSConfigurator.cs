@@ -620,10 +620,19 @@ namespace Wholesome
                 if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
                 {
                     var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
-                    var mouthPosition = DetectMouthPosition(vrcAvatar.VisemeSkinnedMesh,
-                        vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                            visemOhBlendshapeName));
-                    gameObjectMouth.transform.position = mouthPosition;
+                    if (!string.IsNullOrEmpty(visemOhBlendshapeName))
+                    {
+                        var mouthPosition = DetectMouthPosition(vrcAvatar.VisemeSkinnedMesh,
+                            vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                visemOhBlendshapeName));
+                        gameObjectMouth.transform.position = mouthPosition;
+                    }
+                    else
+                    {
+                        var mouthPosition = new Vector3(0, 0.01f, 0.075f);
+                        gameObjectMouth.transform.localPosition =
+                            Vector3.Scale(mouthPosition, inverseArmatureScale) * bakedScale;
+                    }
                 }
                 else
                 {
