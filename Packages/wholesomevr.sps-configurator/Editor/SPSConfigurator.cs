@@ -824,6 +824,7 @@ namespace Wholesome
                             GUILayout.Label("Blendshape/Symmetric Toggles", blendshapeLabelStyle);
                             EditorGUILayout.EndHorizontal();                            
                             toggles["Mouth"].Draw(meshes);
+                            toggles["Hand"].Draw(meshes);
                         }
                         foreach (var socket in Wholesome.Base.SocketsInCategory(category))
                         {

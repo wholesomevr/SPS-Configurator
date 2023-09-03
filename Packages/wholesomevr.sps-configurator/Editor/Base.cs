@@ -11,7 +11,7 @@ namespace Wholesome
     {
         public string Name;
 
-        [Socket(Name = "Handjob", Type = SocketType.Ring, Bone = Bone.Hand, Symmetric = true, Both = true, BothName = "Double Handjob")]
+        [Socket(Name = "Handjob", Category = Category.Handjob, Type = SocketType.Ring, Bone = Bone.Hand, Symmetric = true, Both = true, BothName = "Double Handjob")]
         public Offset Hand;
 
         [Socket(Type = SocketType.Hole, Bone = Bone.Hips, Blendshape = true)]
@@ -68,6 +68,7 @@ namespace Wholesome
         public enum Category
         {
             Default,
+            Handjob,
             Special,
             Feet
         }
