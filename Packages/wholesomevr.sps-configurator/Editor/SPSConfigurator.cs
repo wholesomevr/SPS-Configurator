@@ -201,9 +201,12 @@ namespace Wholesome
             var transforms = new HashSet<Transform>(meshes.SelectMany(mesh => mesh.bones));
             foreach (var bone in transforms)
             {
-                if (boneToHuman.TryGetValue(bone.name, out var humanBoneName))
+                if (bone != null)
                 {
-                    humanToTransform[humanBoneName] = bone;
+                    if (boneToHuman.TryGetValue(bone.name, out var humanBoneName))
+                    {
+                        humanToTransform[humanBoneName] = bone;
+                    }
                 }
             }
 
