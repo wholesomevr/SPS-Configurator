@@ -106,6 +106,8 @@ namespace Wholesome
                 Positon = new Vector3(-0.0331f, 0.0474f, 0.0117f),
                 EulerAngles = new Vector3(-17.653f, 2.02f, -1.671f),
             },
+            PussyBlendshape = "Pussy_1",
+            AnalBlendshape = "Ass_1",
             DefaultHipLength = 0.1005178f,
         };
         
