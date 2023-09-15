@@ -577,6 +577,7 @@ namespace Wholesome
                     {
                         Object.DestroyImmediate(socketVrcfRight);
                     }
+                    // TODO: Remove move menu from left & right after destroying
                 }
                 else if (socket.Info.Parent)
                 {
