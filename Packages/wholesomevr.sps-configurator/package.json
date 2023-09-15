@@ -5,7 +5,7 @@
   "description": "Automatic SPS setup on commonly used body bases",
   "gitDependencies": {},
   "vpmDependencies": {
-    "com.vrchat.avatars": "~3.2.0"
+    "com.vrchat.avatars": "3.*"
   },
   "author": {
     "name": "wholesomevr",
