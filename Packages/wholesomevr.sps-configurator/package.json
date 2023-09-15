@@ -1,7 +1,7 @@
 {
   "name": "wholesomevr.sps-configurator",
   "displayName": "wholesome\u00a9 SPS Configurator",
-  "version": "0.0.12",
+  "version": "1.0.0",
   "description": "Automatic SPS setup on commonly used body bases",
   "gitDependencies": {},
   "vpmDependencies": {
