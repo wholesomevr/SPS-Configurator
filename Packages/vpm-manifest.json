@@ -6,37 +6,37 @@
     "com.vrchat.avatars": {
       "version": "3.2.3"
     },
-    "vrchat.blackstartx.gesture-manager": {
-      "version": "3.8.5"
-    },
     "com.poiyomi.toon": {
       "version": "8.1.167"
+    },
+    "vrchat.blackstartx.gesture-manager": {
+      "version": "3.8.6"
     }
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.409.0",
+      "version": "1.425.0",
       "dependencies": {}
     },
     "com.vrchat.avatars": {
-      "version": "3.2.3",
+      "version": "3.3.0",
       "dependencies": {
-        "com.vrchat.base": "3.2.3"
+        "com.vrchat.base": "3.3.0"
       }
     },
     "com.vrchat.base": {
-      "version": "3.2.3",
+      "version": "3.3.0",
       "dependencies": {}
-    },
-    "vrchat.blackstartx.gesture-manager": {
-      "version": "3.8.5",
-      "dependencies": {
-        "com.vrchat.avatars": "3.2.x"
-      }
     },
     "com.poiyomi.toon": {
       "version": "8.1.167",
       "dependencies": {}
+    },
+    "vrchat.blackstartx.gesture-manager": {
+      "version": "3.8.6",
+      "dependencies": {
+        "com.vrchat.avatars": "3.2.x || 3.3.x"
+      }
     }
   }
 }
