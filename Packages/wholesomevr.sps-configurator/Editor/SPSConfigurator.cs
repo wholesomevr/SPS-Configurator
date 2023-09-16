@@ -194,6 +194,7 @@ namespace Wholesome
             }
         }
 
+        // TODO: Use root bone?
         public static Dictionary<string, Transform> BuildSkeleton(SkinnedMeshRenderer[] meshes, HumanBone[] bones)
         {
             var boneToHuman = bones.ToDictionary(bone => bone.boneName, bone => bone.humanName);
@@ -510,7 +511,7 @@ namespace Wholesome
                 .Where(mesh => mesh.transform.parent == avatarGameObject.transform)
                 .ToArray();
             var humanToTransform = BuildSkeleton(meshes, unityAvatar.humanDescription.human);
-            var armature = humanToTransform["Hips"].parent;
+            var armature = humanToTransform["Hips"].parent; // TODO: Missing key issue
             Debug.Assert(armature.parent == avatarGameObject.transform,
                 "Armature is doesn't share parent with mesh");
             Clear(avatarGameObject);
@@ -749,7 +750,16 @@ namespace Wholesome
                 {
                     if (GUILayout.Button("Apply", GUILayout.Width(128), GUILayout.Height(32)))
                     {
-                        apply();
+                        try
+                        {
+                            apply();
+
+                        }
+                        catch (Exception e)
+                        {
+                            EditorUtility.DisplayDialog("Error", $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.", "Ok");
+                            throw;
+                        }
                     }
                     if (GUILayout.Button("Clear", GUILayout.Width(128), GUILayout.Height(32)))
                     {
@@ -769,30 +779,38 @@ namespace Wholesome
             {
                 if (GUILayout.Button("Add test penetrator to Avatar", linkStyle, GUILayout.ExpandWidth(false)))
                 {
-                    var testPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
-                        "Packages/wholesomevr.sps-configurator/Assets/Actual Wholesome Lollipop.prefab");
-                    var initiatedPrefab = PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
-                    var animator = selectedAvatar.gameObject.GetComponent<Animator>();
-                    Debug.Assert(animator != null, "No animator on the avatar");
-                    var unityAvatar = animator.avatar;
-                    var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
-                        .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
-                        .ToArray();
-                    var humanToTransform = BuildSkeleton(avatarMeshes, unityAvatar.humanDescription.human);
-                    if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                    try
                     {
-                        var visemOhBlendshapeName = SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
-                        var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
-                            SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                visemOhBlendshapeName));
-                        var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                        initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                        var testPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                            "Packages/wholesomevr.sps-configurator/Assets/Actual Wholesome Lollipop.prefab");
+                        var initiatedPrefab = PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
+                        var animator = selectedAvatar.gameObject.GetComponent<Animator>();
+                        Debug.Assert(animator != null, "No animator on the avatar");
+                        var unityAvatar = animator.avatar;
+                        var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
+                            .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
+                            .ToArray();
+                        var humanToTransform = BuildSkeleton(avatarMeshes, unityAvatar.humanDescription.human);
+                        if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                        {
+                            var visemOhBlendshapeName = SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
+                            var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
+                                SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                    visemOhBlendshapeName));
+                            var position = mouthPosition + new Vector3(0, 0, 0.3f);
+                            initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                        }
+                        else
+                        {
+                            var mouthPosition = humanToTransform["Head"].transform.TransformPoint(new Vector3(0, 0.01f, 0.075f));
+                            var position = mouthPosition + new Vector3(0, 0, 0.3f);
+                            initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                        }
                     }
-                    else
+                    catch (Exception e)
                     {
-                        var mouthPosition = humanToTransform["Head"].transform.TransformPoint(new Vector3(0, 0.01f, 0.075f));
-                        var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                        initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                        EditorUtility.DisplayDialog("Error", $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.", "Ok");
+                        throw;
                     }
                 }
             }
