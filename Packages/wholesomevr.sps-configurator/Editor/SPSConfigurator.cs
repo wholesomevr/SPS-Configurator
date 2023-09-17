@@ -210,7 +210,11 @@ namespace Wholesome
                     }
                 }
             }
-
+            // Sometimes Unity reports wrong Transform for Hips (Reference to armature object???)
+            if (!humanToTransform.ContainsKey("Hips"))
+            {
+                humanToTransform["Hips"] = humanToTransform["Spine"].parent;
+            }
             return humanToTransform;
         }
 
