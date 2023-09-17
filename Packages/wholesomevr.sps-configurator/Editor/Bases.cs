@@ -56,7 +56,7 @@ namespace Wholesome
             },
             DefaultTorsoLength = 0.3600037f
         };
-        
+
         public static Base ImLeXz = new Base
         {
             Name = "ImLeXz",
@@ -110,7 +110,7 @@ namespace Wholesome
             AnalBlendshape = "Ass_1",
             DefaultHipLength = 0.1005178f,
         };
-        
+
         public static Base Panda = new Base
         {
             Name = "Panda",
@@ -168,7 +168,7 @@ namespace Wholesome
             Name = "Tori Base",
             Hand = new Base.Offset(new Vector3(0, 0.0644f, -0.0307f), new Vector3(0, -90f, 0)),
             Pussy = new Base.Offset(new Vector3(0, -0.127297f, -0.01245906f), new Vector3(90, 0, 0)),
-            Anal = new Base.Offset(new Vector3(0, -0.100751f, -0.05263702f), new Vector3(126.387f,0, 0)),
+            Anal = new Base.Offset(new Vector3(0, -0.100751f, -0.05263702f), new Vector3(126.387f, 0, 0)),
             Titjob = new Base.Offset(new Vector3(0, 0.0069f, 0.1068f), new Vector3(76.802f, 0, 0)),
             Assjob = new Base.Offset(new Vector3(0, -0.0926f, -0.0978f), new Vector3(90, 0, 0)),
             Thighjob = new Base.Offset(new Vector3(0, 0.0996f, 0), new Vector3()),
@@ -180,7 +180,7 @@ namespace Wholesome
             AnalBlendshape = "BUTTHOLE_open",
             DefaultHipLength = 0.102655f
         };
-        
+
         public static Base ZinFit = new Base
         {
             Name = "Zin Fit",
@@ -225,6 +225,7 @@ namespace Wholesome
             PussyBlendshape = "Coochy Open",
             DefaultHipLength = 0.0715912f
         };
+
         public static Base ZinRP = new Base
         {
             Name = "Zin RP",
@@ -271,7 +272,62 @@ namespace Wholesome
             DefaultHipLength = 0.0810318f
         };
 
-        public static readonly Base[] All = { Generic, Panda, ImLeXz, ToriBase, ZinFit, ZinRP };
+        public static Base TVF = new Base
+        {
+            Name = "TVF",
+            Hand = new Base.Offset
+            {
+                Positon = new Vector3(0.0000f, 0.0520f, -0.0269f),
+                EulerAngles = new Vector3(0.0000f, 270.0000f, 0.0000f)
+            },
+            Pussy = new Base.Offset
+            {
+                Positon = new Vector3(-0.0237f, -0.0757f, 0.0000f),
+                EulerAngles = new Vector3(75.0000f, 270.0000f, 270.0000f)
+            },
+            Anal = new Base.Offset
+            {
+                Positon = new Vector3(0.0382f, -0.0667f, 0.0000f),
+                EulerAngles = new Vector3(75.0000f, 90.0000f, 90.0000f)
+            },
+            Titjob = new Base.Offset
+            {
+                Positon = new Vector3(-0.1033f, 0.0321f, 0.0000f),
+                EulerAngles = new Vector3(90.0000f, 0.0000f, 0.0000f),
+            },
+            Assjob = new Base.Offset
+            {
+                Positon = new Vector3(0.1051f, -0.0103f, 0.0000f),
+                EulerAngles = new Vector3(90.0000f, 0.0000f, 0.0000f),
+            },
+            Thighjob = new Base.Offset(new Vector3(0.0000f, 0.0995f, 0.0000f), new Vector3(0.0004f, 2.2970f, -0.0212f)),
+            SoleFlat = new Base.Offset
+            {
+                Positon = new Vector3(0.0000f, 0.0828f, 0.0390f),
+                EulerAngles = new Vector3(64.4280f, 0.0000f, 0.0000f),
+            },
+            SoleHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0.0000f, 0.0828f, 0.0390f),
+                EulerAngles = new Vector3(64.4280f, 0.0000f, 0.0000f),
+            },
+            FootjobFlat = new Base.Offset
+            {
+                Positon = new Vector3(0.0000f, 0.0346f, 0.0181f),
+                EulerAngles = new Vector3(-25.5670f, 0.0000f, 0.0000f),
+            },
+            FootjobHeeled = new Base.Offset
+            {
+                Positon = new Vector3(0.0000f, 0.0346f, 0.0181f),
+                EulerAngles = new Vector3(-25.5670f, 0.0000f, 0.0000f),
+            },
+            PussyBlendshape = "Orifice",
+            AnalBlendshape = "Orifice2",
+            DefaultHipLength = 0.0761f,
+        };
+
+
+        public static readonly Base[] All = { Generic, Panda, ImLeXz, ToriBase, TVF, ZinFit, ZinRP };
         public static string[] Names => All.Select(b => b.Name).ToArray();
     }
 }
