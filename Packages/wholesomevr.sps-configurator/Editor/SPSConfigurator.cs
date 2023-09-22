@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Numerics;
+using System.Text;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.Animations;
@@ -12,31 +14,60 @@ using VF.Model.StateAction;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
 using Object = UnityEngine.Object;
+using Quaternion = UnityEngine.Quaternion;
+using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
 namespace Wholesome
 {
     public class SPSConfigurator : EditorWindow
     {
+        enum FootType
+        {
+            Flat,
+            Heeled
+        }
+
+        private static readonly string BlowjobName = "Blowjob";
+        private static readonly string HandjobName = "Handjob";
+        private static readonly string PussyName = "Pussy";
+        private static readonly string AnalName = "Anal";
+        private static readonly string TitjobName = "Titjob";
+        private static readonly string AssjobName = "Assjob";
+        private static readonly string ThighjobName = "Thighjob";
+        private static readonly string SoleName = "Steppies";
+        private static readonly string FootjobName = "Footjob";
+
         private int selectedBase = 0;
-        private Base.FootType selectedFootType = Base.FootType.Flat;
+        private FootType selectedFootType = FootType.Flat;
         private Texture2D categoryLabelBackground;
 
         private Texture2D logo;
 
-        private Dictionary<Base.Category, bool> categoryToggles;
-        private Dictionary<string, Toggle> toggles;
+        private bool defaultOn = true;
+        private bool specialOn = true;
+        private bool feetOn = true;
 
-        private string[] autoOn = {
-            "Blowjob", "Handjob Right", "Handjob Left", "Pussy", "Steppies Right", "Steppies Left"
-        };
+        private bool blowjobOn = true;
+        private StringBuilder blowjobBlendshape = new StringBuilder("vrc.v_oh");
+        private bool handjobOn = true;
+        private bool handjobLeftOn = true;
+        private bool handjobRightOn = true;
+        private bool handjobBothOn = true;
+        private bool pussyOn = true;
+        private StringBuilder pussyBlendshape = new StringBuilder();
+        private bool analOn = true;
+        private StringBuilder analBlendshape = new StringBuilder();
 
-        private enum Mode
-        {
-            Simple = 0,
-            Advanced = 1
-        }
+        private bool titjobOn = true;
+        private bool assjobOn = true;
+        private bool thighjobOn = true;
 
+        private bool soleOn = true;
+        private bool soleLeftOn = true;
+        private bool soleRightOn = true;
+        private bool footjobOn = true;
+        private SkinnedMeshRenderer[] meshes;
 
         [MenuItem("Tools/Wholesome/SPS Configurator")]
         public static void Open()
@@ -66,116 +97,32 @@ namespace Wholesome
             //weightedPos = new Vector3(0, weightedPos.z, -weightedPos.y); // TODO: Handle all possible head transformations
             return weightedPos;
         }
-        
+
 
         private void OnEnable()
         {
-
-            var enums = Enum.GetValues(typeof(Wholesome.Base.Category)) as Wholesome.Base.Category[];
-            categoryToggles = enums.ToDictionary(category => category, category => true);
-            toggles = new Dictionary<string, Toggle>
-            {
-                {"Mouth", new BlendshapeToggle("Blowjob")
-                {
-                    SelectedBlendshape = "vrc.v_oh"
-                }}
-            };
-            foreach (var socket in Base.SocketInfos)
-            {
-                Toggle toggle;
-                if (socket.Blendshape)
-                {
-                    toggle = new BlendshapeToggle(socket.DisplayName);
-                }
-
-                else if (socket.Symmetric)
-                {
-                    toggle = new SymmetricToggle(socket.DisplayName, socket.Both);
-                }
-                else
-                {
-                    toggle = new Toggle(socket.DisplayName);
-                }
-                toggles.Add(socket.Name, toggle);
-                if (socket.Both)
-                {
-                    toggles.Add(socket.BothName, new Toggle(socket.BothName));
-                }
-            }
             logo = Resources.Load<Texture2D>("SPS Logo");
             categoryLabelBackground = new Texture2D(1, 1);
             categoryLabelBackground.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.3f));
             categoryLabelBackground.Apply();
-            //GuessBase();
-        }
-
-        private void GuessBase()
-        {
-            var selected = SelectedAvatar;
-            if (selected != null)
-            {
-                var meshes = selected.gameObject.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-                var blendshapes = meshes.SelectMany(mesh => Enumerable.Range(0, mesh.sharedMesh.blendShapeCount)
-                    .Select(j => mesh.sharedMesh.GetBlendShapeName(j))).ToImmutableHashSet();
-                for (var i = 0; i < Bases.All.Length; i++)
-                {
-                    var baseBlendshapes = new HashSet<string>(Bases.All[i].Blendshapes);
-                    if (baseBlendshapes.Count > 0)
-                    {
-                        baseBlendshapes.IntersectWith(blendshapes);
-                        if (Bases.All[i].Blendshapes.Count() == baseBlendshapes.Count)
-                        {
-                            selectedBase = i;
-                            break;
-                        }
-                    }
-                }
-            }
+            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
         }
 
         public void OnSelectionChange()
         {
-            //GuessBase();
+            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
             Repaint();
-        }
-
-        public static (int, int) GuessBodyMesh(SkinnedMeshRenderer[] meshes)
-        {
-            for (var i = 0; i < Bases.All.Length; i++)
-            {
-                var blendshapes = Bases.All[i].Blendshapes;
-                var classifiedMeshIndices = meshes
-                    .Select((mesh, j) => (mesh, j))
-                    .Where(meshI =>
-                    {
-                        var mesh = meshI.mesh;
-                        var blendshapeNames = Enumerable.Range(0, mesh.sharedMesh.blendShapeCount)
-                            .Select(j => mesh.sharedMesh.GetBlendShapeName(j))
-                            .ToImmutableHashSet();
-                        var intersection = blendshapeNames.Intersect(blendshapes);
-                        return intersection.Count == blendshapes.Count();
-                    })
-                    .Select(meshI => meshI.j).ToArray();
-                if (classifiedMeshIndices.Length == 1)
-                {
-                    return (classifiedMeshIndices.First(), i);
-                }
-                else
-                {
-                    Debug.LogWarning($"Matches: {classifiedMeshIndices.Length}");
-                }
-            }
-
-            return (-1, -1);
         }
 
         public void SetBlendshapes()
         {
             var @base = Bases.All[selectedBase];
-            toggles["Pussy"].SelectedBlendshape = @base.PussyBlendshape;
-            toggles["Anal"].SelectedBlendshape = @base.AnalBlendshape;
+            pussyBlendshape.Clear();
+            pussyBlendshape.Append(@base.PussyBlendshape);
+            analBlendshape.Clear();
+            analBlendshape.Append(@base.AnalBlendshape);
         }
-        
+
         private VRCAvatarDescriptor SelectedAvatar
         {
             get
@@ -190,6 +137,7 @@ namespace Wholesome
                         selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault();
                     }
                 }
+
                 return selectedAvatar;
             }
         }
@@ -210,279 +158,155 @@ namespace Wholesome
                     }
                 }
             }
+
             // Sometimes Unity reports wrong Transform for Hips (Reference to armature object???)
             if (!humanToTransform.ContainsKey("Hips"))
             {
                 humanToTransform["Hips"] = humanToTransform["Spine"].parent;
             }
+
             return humanToTransform;
         }
 
-        // TODO: Get Socket names from Marker Component to clear VRCFury component
-        public static void Clear(GameObject avatarGameObject)
+        private void DrawSymmetricToggle(string name, ref bool on, ref bool left, ref bool right)
         {
-            var socketNames = Base.SocketInfos.SelectMany(info =>
+            using (new GUILayout.HorizontalScope())
             {
-                if (info.Symmetric)
+                on = EditorGUILayout.ToggleLeft(name, on, GUILayout.Width(64 + 16));
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.BeginHorizontal();
+                using (new EditorGUI.DisabledScope(!on))
                 {
-                    if (info.Both)
-                    {
-                        
-                        return new[]
-                        {
-                            $"{info.DisplayName} Left", $"{info.DisplayName} Right", $"Double {info.DisplayName}",
-                        };
-                    }
-                    else
-                    {
-                        return new[]
-                        {
-                            $"{info.DisplayName} Left", $"{info.DisplayName} Right",
-                        };
-                    }
+                    left = EditorGUILayout.ToggleLeft("Left", left, GUILayout.Width(64));
+                    right = EditorGUILayout.ToggleLeft("Right", right, GUILayout.Width(64));
                 }
-                else
-                {
-                    return new[]
-                    {
-                        $"{info.DisplayName}",
-                    };
-                }
-            }).ToList();
-            socketNames.Add("Blowjob");
-            var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
-            
-            foreach (var socket in sockets)
-            {
-                if (socket != null)
-                {
-                    var parent = socket.transform.parent;
-                    if (parent.name == "SPS" && socketNames.Contains(socket.name))
-                    {
-                        Object.DestroyImmediate(socket.gameObject);
-                        if (parent.childCount == 0)
-                        {
-                            Object.DestroyImmediate(parent.gameObject);
-                        }
-                    }
-                }
-            }
 
-            var furies = avatarGameObject.GetComponents<VRCFury>();
-            var hasMenuMove = false;
-            var possiblePaths = socketNames.Select(name => $"Sockets/{name}").ToList();
-            var possibleIcons = Wholesome.Base.Categories.Select(category => $"Sockets/{category}").ToArray();
-            foreach (var vrcFury in furies)
-            {
-                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && m.fromPath == "Sockets");
-                vrcFury.config.features.RemoveAll(feature =>
-                    feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
-                vrcFury.config.features.RemoveAll(feature => feature is SetIcon i && possibleIcons.Contains(i.path));
-                if (vrcFury.config.features.Count == 0)
-                {
-                    Object.DestroyImmediate(vrcFury);
-                }
+                EditorGUILayout.EndHorizontal();
             }
         }
 
-        private class Toggle
+        private void DrawSymmetricBothToggle(string name, ref bool on, ref bool left, ref bool right, ref bool both)
         {
-            public bool On = true;
-            public bool Left = true;
-            public bool Right = true;
-            public bool Both = true;
-            public string SelectedBlendshape = null;
-            protected string Name;
-
-            public Toggle(string name)
+            using (new GUILayout.HorizontalScope())
             {
-                Name = name;
-            }
-
-            public virtual void Draw(SkinnedMeshRenderer[] meshes)
-            {
-                On = EditorGUILayout.ToggleLeft(Name, On);
-            }
-        }
-
-        private class SymmetricToggle : Toggle
-        {
-            private bool showBoth;
-
-            public SymmetricToggle(string name, bool showBoth = false) : base(name)
-            {
-                this.showBoth = showBoth;
-            }
-
-            public override void Draw(SkinnedMeshRenderer[] meshes)
-            {
-                using (new GUILayout.HorizontalScope())
+                on = EditorGUILayout.ToggleLeft(name, on, GUILayout.Width(64 + 16));
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.BeginHorizontal();
+                using (new EditorGUI.DisabledScope(!on))
                 {
-                    On = EditorGUILayout.ToggleLeft(Name, On, GUILayout.Width(64 + 16));
-                    GUILayout.FlexibleSpace();
-                    EditorGUILayout.BeginHorizontal();
-                    using (new EditorGUI.DisabledScope(!On))
-                    {
-                        Left = EditorGUILayout.ToggleLeft("Left", Left, GUILayout.Width(64));
-                        Right = EditorGUILayout.ToggleLeft("Right", Right, GUILayout.Width(64));
-                        if (showBoth)
-                        {
-                            Both = EditorGUILayout.ToggleLeft("Double", Both, GUILayout.Width(64));
-                        }
-                    }
-                    EditorGUILayout.EndHorizontal();
+                    left = EditorGUILayout.ToggleLeft("Left", left, GUILayout.Width(64));
+                    right = EditorGUILayout.ToggleLeft("Right", right, GUILayout.Width(64));
+                    both = EditorGUILayout.ToggleLeft("Double", both, GUILayout.Width(64));
                 }
+
+                EditorGUILayout.EndHorizontal();
             }
         }
 
-        private class BlendshapeToggle : Toggle
+
+        private void DrawBlendshapeToggle(IEnumerable<SkinnedMeshRenderer> meshes, string name, ref bool on,
+            StringBuilder blendshape)
         {
-            public BlendshapeToggle(string name) : base(name)
+            using (new EditorGUILayout.HorizontalScope())
             {
-            }
+                on = EditorGUILayout.ToggleLeft(name, on, GUILayout.ExpandWidth(false));
+                GUILayout.FlexibleSpace();
 
-            public override void Draw(SkinnedMeshRenderer[] meshes)
-            {
-                using (new EditorGUILayout.HorizontalScope())
+
+                using (new EditorGUI.DisabledScope(!on || meshes == null))
                 {
-                    On = EditorGUILayout.ToggleLeft(Name, On, GUILayout.ExpandWidth(false));
-                    GUILayout.FlexibleSpace();
-
-
-                    using (new EditorGUI.DisabledScope(!On || meshes == null))
+                    if (EditorGUILayout.DropdownButton(
+                            new GUIContent(blendshape.Length > 0 ? blendshape.ToString() : "None"), FocusType.Keyboard,
+                            GUILayout.Width(64 * 3 + 8)))
                     {
-                        if (EditorGUILayout.DropdownButton(new GUIContent(SelectedBlendshape ?? "None"), FocusType.Keyboard, GUILayout.Width(64*3 + 8)))
+                        var menu = new GenericMenu();
+                        menu.AddItem(new GUIContent("None"),
+                            blendshape.Length == 0, () => { blendshape.Clear(); });
+
+                        foreach (var mesh in meshes)
                         {
-                            var menu = new GenericMenu();
-                            menu.AddItem(new GUIContent($"None"),
-                                SelectedBlendshape == null, () => { SelectedBlendshape = null; });
-                            for (int i = 0; i < meshes.Length; i++)
+                            for (int j = 0; j < mesh.sharedMesh.blendShapeCount; j++)
                             {
-                                for (int j = 0; j < meshes[i].sharedMesh.blendShapeCount; j++)
-                                {
-                                    var blendshapeName = meshes[i].sharedMesh.GetBlendShapeName(j);
-                                    var menuEntry = $"{meshes[i].name}/{blendshapeName}";
-                                    menu.AddItem(new GUIContent(menuEntry),
-                                        SelectedBlendshape == blendshapeName,
-                                        blendshapeNameObject => { SelectedBlendshape = blendshapeNameObject as string; }, blendshapeName);
-                                }
+                                var blendshapeName = mesh.sharedMesh.GetBlendShapeName(j);
+                                var menuEntry = $"{mesh.name}/{blendshapeName}";
+                                menu.AddItem(new GUIContent(menuEntry),
+                                    blendshape.ToString() == blendshapeName,
+                                    blendshapeNameObject =>
+                                    {
+                                        blendshape.Clear();
+                                        blendshape.Append(blendshapeNameObject as string);
+                                    },
+                                    blendshapeName);
                             }
-                            menu.ShowAsContext();
                         }
+
+                        menu.ShowAsContext();
                     }
                 }
             }
         }
 
-        // TODO: Check for optional bone "Chest"
-
-
-        public struct SocketCreate
+        private Transform CreateAligned(Transform parent)
         {
-            public string Name;
-            public VRCFuryHapticSocket.AddLight AddLight;
-            public Vector3 Position;
-            public Vector3 EulerAngles;
+            var aligned = new GameObject("Aligned");
+            aligned.transform.SetParent(parent, false);
+            var alignedX = Vector3.Cross(parent.up, Vector3.up);
+            var sign = Mathf.Sign(Vector3.Dot(parent.up, Vector3.right));
+            aligned.transform.localEulerAngles =
+                new Vector3(0, sign * Vector3.Angle(parent.transform.right, alignedX), 0);
+            return aligned.transform;
         }
 
-        public static void CreateSocket(SocketCreate socketCreate)
+        private void SetParentLocalPositionEulerAngles(Transform transform, Transform parent, Vector3 position,
+            Vector3 rotation)
         {
+            transform.SetParent(parent, false);
+            transform.localPosition = position;
+            transform.localEulerAngles = rotation;
         }
 
-        public VRCFuryHapticSocket CreateSocket(Base.Socket socket, string name, string boneName,
-            Dictionary<string, Transform> armature,
-            Vector3 inverseArmatureScale, List<MoveMenuItem> menuMoves, float bakedScale, bool alignBone = false)
+        private void SetSymmetricParent(GameObject gameObject, Transform leftTarget, Transform rightTarget,
+            Vector3 offsetPosition, Vector3 offsetRotation)
+        {
+            var parent = gameObject.AddComponent<ParentConstraint>();
+            parent.AddSource(new ConstraintSource
+            {
+                sourceTransform = leftTarget.transform,
+                weight = 1
+            });
+            parent.AddSource(new ConstraintSource
+            {
+                sourceTransform = rightTarget.transform,
+                weight = 1
+            });
+            parent.SetTranslationOffset(0, offsetPosition);
+            parent.SetRotationOffset(0, offsetRotation);
+            parent.SetTranslationOffset(1, offsetPosition);
+            parent.SetRotationOffset(1, offsetRotation);
+            parent.locked = true;
+            parent.constraintActive = true;
+        }
+
+        public VRCFuryHapticSocket CreateSocket(string name, VRCFuryHapticSocket.AddLight light, bool auto)
         {
             var gameObject = new GameObject(name);
             var socketVrcf = gameObject.AddComponent<VRCFuryHapticSocket>();
             socketVrcf.Version = 7;
-            switch (socket.Info.Type)
-            {
-                case Base.SocketType.Hole:
-                    socketVrcf.addLight = VRCFuryHapticSocket.AddLight.Hole;
-                    break;
-                case Base.SocketType.Ring:
-                    socketVrcf.addLight = VRCFuryHapticSocket.AddLight.Ring;
-                    break;
-            }
+            socketVrcf.addLight = light;
 
             socketVrcf.name = name;
-            socketVrcf.enableAuto = autoOn.Contains(name);
-            var boneTransform = armature[boneName];
-            var sps = boneTransform.Find("SPS")?.gameObject;
-            if (sps == null)
-            {
-                sps = new GameObject("SPS");
-                sps.transform.SetParent(boneTransform, false);
-            }
-            sps.transform.localPosition = Vector3.zero;
-            sps.transform.localEulerAngles = Vector3.zero;
-
-            if (alignBone)
-            {
-                var alignedX = Vector3.Cross(sps.transform.up, Vector3.up);
-                var sign = Mathf.Sign(Vector3.Dot(sps.transform.up, Vector3.right));
-                sps.transform.localEulerAngles =
-                    new Vector3(0, sign * Vector3.Angle(sps.transform.right, alignedX), 0);
-                gameObject.transform.SetParent(sps.transform, false);
-                gameObject.transform.localPosition =
-                    Vector3.Scale(socket.Location.Positon, inverseArmatureScale) * bakedScale;
-                gameObject.transform.localEulerAngles = sign * socket.Location.EulerAngles;
-            }
-            else
-            {
-                gameObject.transform.SetParent(sps.transform, false);
-                gameObject.transform.localPosition =
-                    Vector3.Scale(socket.Location.Positon, inverseArmatureScale) * bakedScale;
-                gameObject.transform.localEulerAngles = socket.Location.EulerAngles;
-            }
-
-            if (socket.Info.Category != Base.Category.Default)
-            {
-                menuMoves.Add(new MoveMenuItem
-                {
-                    fromPath = $"Sockets/{socketVrcf.name}",
-                    toPath = $"Sockets/{socket.Info.Category.ToString()}/{socketVrcf.name}"
-                });
-            }
-
+            socketVrcf.enableAuto = auto;
             return socketVrcf;
-
-            /*
-            var vrcFurySetIcon = gameObject.AddComponent<VRCFury>();
-            vrcFurySetIcon.config.features.Add(new SetIcon
-            {
-                path = $"Sockets/{socketVrcf.name}",
-                icon = AssetDatabase.LoadAssetAtPath<Texture2D>(
-                    "Packages/com.vrchat.avatars/Samples/AV3 Demo Assets/Expressions Menu/Icons/hand_normal.png")
-            });
-            switch (socket.Info.Category)
-            {
-                case Base.Category.Special:
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socketVrcf.name}",
-                        toPath = $"Sockets/Special/{socketVrcf.name}"
-                    });
-                    break;
-                case Base.Category.Feet:
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socketVrcf.name}",
-                        toPath = $"Sockets/Feet/{socketVrcf.name}"
-                    });
-                    break;
-            }
-            */
         }
 
-        public static void AddBlendshape(VRCFuryHapticSocket hapticSocket, SkinnedMeshRenderer mesh, string blendshape)
+        public static void AddBlendshape(VRCFuryHapticSocket hapticSocket, string blendshape)
         {
             var state = new State();
             state.actions.Add(new BlendShapeAction
             {
                 blendShape = blendshape
             });
+            hapticSocket.enableDepthAnimations = true;
             hapticSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
             {
                 state = state,
@@ -491,14 +315,6 @@ namespace Wholesome
                 endDistance = 0,
                 smoothingSeconds = 0,
             });
-        }
-
-        private bool HasBlendshapes(VRCAvatarDescriptor avatar, string blendshape)
-        {
-            var meshes = avatar.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            var blendshapes = meshes.SelectMany(mesh => Enumerable.Range(0, mesh.sharedMesh.blendShapeCount)
-                .Select(j => mesh.sharedMesh.GetBlendShapeName(j))).ToList();
-            return blendshapes.Contains(blendshape);
         }
 
         private void apply()
@@ -521,150 +337,256 @@ namespace Wholesome
             Clear(avatarGameObject);
             // TODO: Handle no visemes
 
-
             var armatureScale = armature.localScale;
             var inverseArmatureScale = new Vector3(1 / armatureScale.x, 1 / armatureScale.y,
                 1 / armatureScale.z);
             var hipLength = (humanToTransform["Spine"].position - humanToTransform["Hips"].position).magnitude;
-            var bakedScale = hipLength/@base.DefaultHipLength;
+            var bakedScale = hipLength / @base.DefaultHipLength;
             if (selectedBase == 0) // Generic
             {
                 var torsoLength = (humanToTransform["Neck"].position - humanToTransform["Hips"].position).magnitude;
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
+
             var menuMoves = new List<MoveMenuItem>();
-            foreach (var socket in @base.GetSocketsForFootType(selectedFootType))
+            var createdSockets = new List<VRCFuryHapticSocket>();
+            if (defaultOn)
             {
-                if (!toggles[socket.Info.Name].On || !categoryToggles[socket.Info.Category]) // Skip socket when in advanced mode and toggled off
+                if (blowjobOn)
                 {
-                    continue;
-                }
-
-                if (socket.Info.Symmetric)
-                {
-                    var toggle = toggles[socket.Info.Name];
-                    var align = socket.Info.Bone == Base.Bone.Hand;
-                        
-                    var socketVrcfLeft = CreateSocket(socket, $"{socket.Info.DisplayName} Left",
-                            $"Left{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
-
-                    var socketVrcfRight = CreateSocket(socket, $"{socket.Info.DisplayName} Right",
-                            $"Right{socket.Info.Bone.ToString()}", humanToTransform, inverseArmatureScale, menuMoves, bakedScale, align);
-                    if (socket.Info.Both && toggle.Both)
+                    var mouthPosition = new Vector3(0, 0.01f, 0.075f);
+                    if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
                     {
-                        var name = $"Double {socket.Info.DisplayName}";
-                        var socketVrcf = CreateSocket(socket, name, "Hips",
-                            humanToTransform, inverseArmatureScale, menuMoves, bakedScale);
-                        var bothLeftTarget = new GameObject($"{name} Left Target");
-                        bothLeftTarget.transform.SetParent(humanToTransform[Base.BoneName(socket.Info.Bone, Base.Direction.Left)], false);
-                        bothLeftTarget.transform.localPosition = socket.Location.Positon ;
-                        var parent = socketVrcf.gameObject.AddComponent<ParentConstraint>();
-                        parent.AddSource(new ConstraintSource
+                        var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
+                        if (!string.IsNullOrEmpty(visemOhBlendshapeName))
                         {
-                            sourceTransform = socketVrcfLeft.transform,
-                            weight = 1
-                        });
-                        parent.AddSource(new ConstraintSource
+                            mouthPosition = humanToTransform["Head"].InverseTransformPoint(DetectMouthPosition(
+                                vrcAvatar.VisemeSkinnedMesh,
+                                vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                    visemOhBlendshapeName)));
+                        }
+                    }
+
+                    var socket = CreateSocket(BlowjobName, VRCFuryHapticSocket.AddLight.Hole, true);
+                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Head"],
+                        mouthPosition,
+                        Vector3.zero);
+                    AddBlendshape(socket, blowjobBlendshape.ToString());
+                    createdSockets.Add(socket);
+                }
+
+                if (handjobOn)
+                {
+                    var leftAligned = CreateAligned(humanToTransform["LeftHand"]);
+                    var rightAligned = CreateAligned(humanToTransform["RightHand"]);
+                    if (handjobLeftOn)
+                    {
+                        var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, leftAligned,
+                            Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Hand.EulerAngles);
+                        createdSockets.Add(socket);
+                        menuMoves.Add(new MoveMenuItem
                         {
-                            sourceTransform = socketVrcfRight.transform,
-                            weight = 1
+                            fromPath = $"Sockets/{socket.name}",
+                            toPath = $"Sockets/{HandjobName}/{socket.name}"
                         });
-                        parent.locked = true;
-                        parent.constraintActive = true;
                     }
 
-                    if (!toggle.Left)
+                    if (handjobRightOn)
                     {
-                        Object.DestroyImmediate(socketVrcfLeft);
+                        var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, rightAligned,
+                            Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Hand.EulerAngles);
+                        createdSockets.Add(socket);
+                        menuMoves.Add(new MoveMenuItem
+                        {
+                            fromPath = $"Sockets/{socket.name}",
+                            toPath = $"Sockets/{HandjobName}/{socket.name}"
+                        });
                     }
 
-                    if (!toggle.Right)
+                    if (handjobBothOn)
                     {
-                        Object.DestroyImmediate(socketVrcfRight);
+                        var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
+                        socket.transform.SetParent(humanToTransform["Hips"], false);
+                        SetSymmetricParent(socket.gameObject, leftAligned, rightAligned, Vector3.zero, Vector3.zero);
+                        createdSockets.Add(socket);
+                        menuMoves.Add(new MoveMenuItem
+                        {
+                            fromPath = $"Sockets/{socket.name}",
+                            toPath = $"Sockets/{HandjobName}/{socket.name}"
+                        });
                     }
-                    // TODO: Remove move menu from left & right after destroying
                 }
-                else if (socket.Info.Parent)
+
+                if (pussyOn)
                 {
-                    var socketVrcf = CreateSocket(socket, socket.Info.DisplayName, "Hips",
-                        humanToTransform, inverseArmatureScale, menuMoves, bakedScale);
-                    var parent = socketVrcf.gameObject.AddComponent<ParentConstraint>();
-                    parent.AddSource(new ConstraintSource
-                    {
-                        sourceTransform = humanToTransform[Base.BoneName(socket.Info.Bone, Base.Direction.Left)],
-                        weight = 1
-                    });
-                    parent.SetTranslationOffset(0, socket.Location.Positon);
-                    parent.SetRotationOffset(0, socket.Location.EulerAngles);
-                    parent.AddSource(new ConstraintSource
-                    {
-                        sourceTransform = humanToTransform[Base.BoneName(socket.Info.Bone, Base.Direction.Right)],
-                        weight = 1
-                    });
-                    parent.SetTranslationOffset(1, socket.Location.Positon);
-                    parent.SetRotationOffset(1, socket.Location.EulerAngles);
-                    parent.locked = true;
-                    parent.constraintActive = true;
+                    var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, true);
+                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                        Vector3.Scale(@base.Pussy.Positon, inverseArmatureScale) * bakedScale,
+                        @base.Pussy.EulerAngles);
+                    AddBlendshape(socket, pussyBlendshape.ToString());
+                    createdSockets.Add(socket);
                 }
-                else
+
+                if (analOn)
                 {
-                    // TODO: Handle bone not set in Human Avatar
-                    var socketVrcf = CreateSocket(socket, socket.Info.DisplayName, socket.Info.Bone.ToString(),
-                        humanToTransform, inverseArmatureScale, menuMoves, bakedScale);
-                    if (socket.Info.Blendshape)
-                    {
-                        var blendshape = toggles[socket.Info.Name].SelectedBlendshape;
-                        AddBlendshape(socketVrcf, null, blendshape);
-                        socketVrcf.enableDepthAnimations = true;
-                    }
+                    var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, false);
+                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                        Vector3.Scale(@base.Anal.Positon, inverseArmatureScale) * bakedScale,
+                        @base.Anal.EulerAngles);
+                    AddBlendshape(socket, analBlendshape.ToString());
+                    createdSockets.Add(socket);
                 }
             }
 
-            // TODO: Refactor??
-
-            if (toggles["Mouth"].On && categoryToggles[Base.Category.Default])
+            if (specialOn)
             {
-                var gameObjectMouth = new GameObject("Blowjob");
-                var socketVrcfMouth = gameObjectMouth.AddComponent<VRCFuryHapticSocket>();
-                socketVrcfMouth.Version = 7;
-                socketVrcfMouth.addLight = VRCFuryHapticSocket.AddLight.Hole;
-                socketVrcfMouth.name = "Blowjob";
-                var boneTransformMouth = humanToTransform["Head"];
-                var sps = boneTransformMouth.Find("SPS")?.gameObject;
-                if (sps == null)
+                if (titjobOn)
                 {
-                    sps = new GameObject("SPS");
-                    sps.transform.SetParent(boneTransformMouth, false);
-                }
-                sps.transform.localPosition = Vector3.zero;
-                sps.transform.localEulerAngles = Vector3.zero;
-                gameObjectMouth.transform.SetParent(sps.transform, false);
-
-                var mouthBlendshape = toggles["Mouth"].SelectedBlendshape;
-                AddBlendshape(socketVrcfMouth, null, mouthBlendshape);
-                socketVrcfMouth.enableDepthAnimations = true;
-                if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
-                {
-                    var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
-                    if (!string.IsNullOrEmpty(visemOhBlendshapeName))
+                    var socket = CreateSocket(TitjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Chest"],
+                        Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
+                        @base.Titjob.EulerAngles);
+                    createdSockets.Add(socket);
+                    menuMoves.Add(new MoveMenuItem
                     {
-                        var mouthPosition = DetectMouthPosition(vrcAvatar.VisemeSkinnedMesh,
-                            vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                visemOhBlendshapeName));
-                        gameObjectMouth.transform.position = mouthPosition;
+                        fromPath = $"Sockets/{socket.name}",
+                        toPath = $"Sockets/Special/{socket.name}"
+                    });
+                }
+
+                if (assjobOn)
+                {
+                    var socket = CreateSocket(AssjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                        Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
+                        @base.Assjob.EulerAngles);
+                    createdSockets.Add(socket);
+                    menuMoves.Add(new MoveMenuItem
+                    {
+                        fromPath = $"Sockets/{socket.name}",
+                        toPath = $"Sockets/Special/{socket.name}"
+                    });
+                }
+
+                if (thighjobOn)
+                {
+                    var socket = CreateSocket(ThighjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    socket.transform.SetParent(humanToTransform["Hips"], false);
+                    SetSymmetricParent(socket.gameObject, humanToTransform["LeftUpperLeg"],
+                        humanToTransform["RightUpperLeg"],
+                        Vector3.Scale(@base.Thighjob.Positon, inverseArmatureScale) * bakedScale,
+                        @base.Thighjob.EulerAngles);
+                    createdSockets.Add(socket);
+                    menuMoves.Add(new MoveMenuItem
+                    {
+                        fromPath = $"Sockets/{socket.name}",
+                        toPath = $"Sockets/Special/{socket.name}"
+                    });
+                }
+            }
+
+            if (feetOn)
+            {
+                if (soleOn)
+                {
+                    Vector3 solePosition;
+                    Vector3 soleRotation;
+                    if (selectedFootType == FootType.Flat)
+                    {
+                        solePosition = @base.SoleFlat.Positon;
+                        soleRotation = @base.SoleFlat.EulerAngles;
                     }
                     else
                     {
-                        var mouthPosition = new Vector3(0, 0.01f, 0.075f);
-                        gameObjectMouth.transform.localPosition =
-                            Vector3.Scale(mouthPosition, inverseArmatureScale) * bakedScale;
+                        solePosition = @base.SoleHeeled.Positon;
+                        soleRotation = @base.SoleHeeled.EulerAngles;
                     }
+
+                    if (soleLeftOn)
+                    {
+                        var socket = CreateSocket($"{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftFoot"],
+                            Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
+                            soleRotation);
+                        createdSockets.Add(socket);
+                        menuMoves.Add(new MoveMenuItem
+                        {
+                            fromPath = $"Sockets/{socket.name}",
+                            toPath = $"Sockets/Feet/{socket.name}"
+                        });
+                    }
+
+                    if (soleRightOn)
+                    {
+                        var socket = CreateSocket($"{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightFoot"],
+                            Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
+                            soleRotation);
+                        createdSockets.Add(socket);
+                        menuMoves.Add(new MoveMenuItem
+                        {
+                            fromPath = $"Sockets/{socket.name}",
+                            toPath = $"Sockets/Feet/{socket.name}"
+                        });
+                    }
+                }
+
+                if (footjobOn)
+                {
+                    Vector3 footjobPosition;
+                    Vector3 footjobRotation;
+                    if (selectedFootType == FootType.Flat)
+                    {
+                        footjobPosition = @base.FootjobFlat.Positon;
+                        footjobRotation = @base.FootjobHeeled.EulerAngles;
+                    }
+                    else
+                    {
+                        footjobPosition = @base.FootjobHeeled.Positon;
+                        footjobRotation = @base.FootjobHeeled.EulerAngles;
+                    }
+
+                    var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
+                    socket.transform.SetParent(humanToTransform["Hips"], false);
+                    SetSymmetricParent(socket.gameObject, humanToTransform["LeftFoot"], humanToTransform["RightFoot"],
+                        Vector3.Scale(footjobPosition, inverseArmatureScale) * bakedScale, footjobRotation);
+                    createdSockets.Add(socket);
+                    menuMoves.Add(new MoveMenuItem
+                    {
+                        fromPath = $"Sockets/{socket.name}",
+                        toPath = $"Sockets/Feet/{socket.name}"
+                    });
+                }
+            }
+
+            foreach (var socket in createdSockets)
+            {
+                Transform transform;
+                if (socket.transform.parent.name == "Aligned")
+                {
+                    transform = socket.transform.parent;
                 }
                 else
                 {
-                    var mouthPosition = new Vector3(0, 0.01f, 0.075f);
-                    gameObjectMouth.transform.localPosition =
-                        Vector3.Scale(mouthPosition, inverseArmatureScale) * bakedScale;
+                    transform = socket.transform;
+                }
+
+                if (transform.parent.name != "SPS")
+                {
+                    if (transform.parent.Find("SPS") == null)
+                    {
+                        var sps = new GameObject("SPS");
+                        sps.transform.SetParent(transform.parent, false);
+                        transform.SetParent(sps.transform, true);
+                    }
+                    else
+                    {
+                        transform.SetParent(transform.parent.Find("SPS"), true);
+                    }
                 }
             }
 
@@ -675,6 +597,63 @@ namespace Wholesome
                 fromPath = "Sockets",
                 toPath = "SPS"
             });
+        }
+
+        // TODO: Get Socket names from Marker Component to clear VRCFury component
+        public static void Clear(GameObject avatarGameObject)
+        {
+            string[] socketNames =
+            {
+                BlowjobName, $"{HandjobName} Right", $"{HandjobName} Left", $"Double {HandjobName}", PussyName,
+                AnalName, TitjobName, AssjobName, ThighjobName, $"{SoleName} Left", $"{SoleName} Right",
+                FootjobName
+            };
+            var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
+
+            foreach (var socket in sockets)
+            {
+                if (socket != null)
+                {
+                    if (socketNames.Contains(socket.name))
+                    {
+                        Transform parent = socket.transform.parent;
+                        Object.DestroyImmediate(socket.gameObject);
+                        if (parent.name == "Aligned")
+                        {
+                            if (parent.childCount == 0)
+                            {
+                                var destroy = parent;
+                                parent = parent.parent;
+                                Object.DestroyImmediate(destroy.gameObject);
+                            }
+                        }
+
+                        if (parent.name == "SPS")
+                        {
+                            if (parent.childCount == 0)
+                            {
+                                Object.DestroyImmediate(parent.gameObject);
+                            }
+                        }
+                    }
+                }
+            }
+
+            var furies = avatarGameObject.GetComponents<VRCFury>();
+            var hasMenuMove = false;
+            var possiblePaths = socketNames.Select(name => $"Sockets/{name}").ToList();
+            string[] possibleIcons = { "Sockets/Special", "Sockets/Feet" };
+            foreach (var vrcFury in furies)
+            {
+                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && m.fromPath == "Sockets");
+                vrcFury.config.features.RemoveAll(feature =>
+                    feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
+                vrcFury.config.features.RemoveAll(feature => feature is SetIcon i && possibleIcons.Contains(i.path));
+                if (vrcFury.config.features.Count == 0)
+                {
+                    Object.DestroyImmediate(vrcFury);
+                }
+            }
         }
 
         public void OnGUI()
@@ -690,8 +669,10 @@ namespace Wholesome
             EditorGUILayout.BeginVertical();
             if (Resources.FindObjectsOfTypeAll<VRCAvatarDescriptor>().Length == 0)
             {
-                EditorGUILayout.HelpBox("No Avatar with a VRC Avatar Descriptor found on the active scene.", MessageType.Warning);
+                EditorGUILayout.HelpBox("No Avatar with a VRC Avatar Descriptor found on the active scene.",
+                    MessageType.Warning);
             }
+
             var selectedAvatar = SelectedAvatar;
 
             using (var scope = new EditorGUILayout.HorizontalScope())
@@ -729,19 +710,42 @@ namespace Wholesome
                 if (check.changed)
                 {
                     SetBlendshapes();
+                    if (selectedAvatar != null)
+                    {
+                        meshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>();
+                    }
+                    else
+                    {
+                        meshes = null;
+                    }
                 }
             }
-            
-            selectedFootType = (Base.FootType)GUILayout.Toolbar((int)selectedFootType, new[] { "Flat", "Heeled" });
+
+            selectedFootType = (FootType)GUILayout.Toolbar((int)selectedFootType, new[] { "Flat", "Heeled" });
 
             EditorGUILayout.Space();
 
-            var meshes = selectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
             EditorGUILayout.BeginVertical();
-            drawCategory(Base.Category.Default, meshes);
+            BeginCategory("Default", ref defaultOn);
+            DrawLabels();
+            DrawBlendshapeToggle(meshes, BlowjobName, ref blowjobOn, blowjobBlendshape);
+            DrawSymmetricBothToggle(HandjobName, ref handjobOn, ref handjobLeftOn, ref handjobRightOn,
+                ref handjobBothOn);
+            pussyOn = EditorGUILayout.ToggleLeft(PussyName, pussyOn);
+            DrawBlendshapeToggle(meshes, PussyName, ref pussyOn, pussyBlendshape);
+            DrawBlendshapeToggle(meshes, AnalName, ref analOn, analBlendshape);
+            EndCategory();
+
             EditorGUILayout.BeginHorizontal();
-            drawCategory(Base.Category.Special, meshes);
-            drawCategory(Base.Category.Feet, meshes);
+            BeginCategory("Special", ref specialOn);
+            titjobOn = EditorGUILayout.ToggleLeft(TitjobName, titjobOn);
+            assjobOn = EditorGUILayout.ToggleLeft(AssjobName, assjobOn);
+            thighjobOn = EditorGUILayout.ToggleLeft(ThighjobName, thighjobOn);
+            EndCategory();
+            BeginCategory("Feet", ref feetOn);
+            DrawSymmetricToggle(SoleName, ref soleOn, ref soleLeftOn, ref soleRightOn);
+            footjobOn = EditorGUILayout.ToggleLeft(FootjobName, footjobOn);
+            EndCategory();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
 
@@ -757,14 +761,16 @@ namespace Wholesome
                         try
                         {
                             apply();
-
                         }
                         catch (Exception e)
                         {
-                            EditorUtility.DisplayDialog("Error", $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.", "Ok");
+                            EditorUtility.DisplayDialog("Error",
+                                $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.",
+                                "Ok");
                             throw;
                         }
                     }
+
                     if (GUILayout.Button("Clear", GUILayout.Width(128), GUILayout.Height(32)))
                     {
                         Clear(selectedAvatar.gameObject);
@@ -773,6 +779,7 @@ namespace Wholesome
 
                 GUILayout.FlexibleSpace();
             }
+
             GUILayout.FlexibleSpace();
             EditorGUILayout.BeginHorizontal();
             var linkStyle = new GUIStyle(GUI.skin.button)
@@ -787,7 +794,8 @@ namespace Wholesome
                     {
                         var testPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                             "Packages/wholesomevr.sps-configurator/Assets/Actual Wholesome Lollipop.prefab");
-                        var initiatedPrefab = PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
+                        var initiatedPrefab =
+                            PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
                         var animator = selectedAvatar.gameObject.GetComponent<Animator>();
                         Debug.Assert(animator != null, "No animator on the avatar");
                         var unityAvatar = animator.avatar;
@@ -797,36 +805,45 @@ namespace Wholesome
                         var humanToTransform = BuildSkeleton(avatarMeshes, unityAvatar.humanDescription.human);
                         if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
                         {
-                            var visemOhBlendshapeName = SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
+                            var visemOhBlendshapeName =
+                                SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
                             var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
                                 SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
                                     visemOhBlendshapeName));
                             var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                            initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                            initiatedPrefab.transform.SetPositionAndRotation(position,
+                                Quaternion.AngleAxis(-180, Vector3.left));
                         }
                         else
                         {
-                            var mouthPosition = humanToTransform["Head"].transform.TransformPoint(new Vector3(0, 0.01f, 0.075f));
+                            var mouthPosition = humanToTransform["Head"].transform
+                                .TransformPoint(new Vector3(0, 0.01f, 0.075f));
                             var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                            initiatedPrefab.transform.SetPositionAndRotation(position, Quaternion.AngleAxis(-180, Vector3.left));
+                            initiatedPrefab.transform.SetPositionAndRotation(position,
+                                Quaternion.AngleAxis(-180, Vector3.left));
                         }
                     }
                     catch (Exception e)
                     {
-                        EditorUtility.DisplayDialog("Error", $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.", "Ok");
+                        EditorUtility.DisplayDialog("Error",
+                            $"An error occured: {e.Message}\n\nCheck the Unity console for further information.\nIt is most likely a bug. Please report the issue on my Discord.",
+                            "Ok");
                         throw;
                     }
                 }
             }
+
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Discord", linkStyle, GUILayout.ExpandWidth(false)))
             {
                 Application.OpenURL("https://discord.gg/Rtp3wvJu8s");
             }
+
             if (GUILayout.Button("Gumroad", linkStyle, GUILayout.ExpandWidth(false)))
             {
                 Application.OpenURL("https://wholesomevr.gumroad.com/?referrer=SPS");
             }
+
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.Space();
             EditorGUILayout.EndVertical();
@@ -834,76 +851,41 @@ namespace Wholesome
             EditorGUILayout.EndHorizontal();
         }
 
-        private void drawCategory(Base.Category category, SkinnedMeshRenderer[] meshes)
+        private void DrawLabels()
+        {
+            EditorGUILayout.BeginHorizontal();
+            var toggleLabelStyle = new GUIStyle(GUI.skin.label);
+            toggleLabelStyle.margin = new RectOffset(2, 4, 0, 8);
+            toggleLabelStyle.normal.textColor = Color.gray;
+            GUILayout.Label("Toggle", toggleLabelStyle);
+            GUILayout.FlexibleSpace();
+            var blendshapeLabelStyle = new GUIStyle(GUI.skin.label);
+            blendshapeLabelStyle.margin = new RectOffset(4, 16, 0, 8);
+            blendshapeLabelStyle.normal.textColor = Color.gray;
+            GUILayout.Label("Blendshape/Symmetric Toggles", blendshapeLabelStyle);
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void BeginCategory(string categoryName, ref bool on)
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
             var style = new GUIStyle(GUI.skin.box);
             style.normal.background = style.normal.scaledBackgrounds[0];
             EditorGUILayout.BeginHorizontal(style);
-            categoryToggles[category] =
-                EditorGUILayout.ToggleLeft(category.ToString(), categoryToggles[category], EditorStyles.boldLabel);
+            on = EditorGUILayout.ToggleLeft(categoryName, on, EditorStyles.boldLabel);
             EditorGUILayout.EndHorizontal();
-            using (new EditorGUI.DisabledScope(!categoryToggles[category]))
-            {
-                var togglesStyle = new GUIStyle(GUI.skin.label);
-                togglesStyle.padding = new RectOffset(8, 8, 8, 8);
-                using (new EditorGUILayout.HorizontalScope(togglesStyle))
-                {
+            GUI.enabled = on;
+            var togglesStyle = new GUIStyle(GUI.skin.label);
+            togglesStyle.padding = new RectOffset(8, 8, 8, 8);
+            EditorGUILayout.BeginHorizontal(togglesStyle);
+            EditorGUILayout.BeginVertical();
+        }
 
-                    //EditorGUILayout.Space(16);
-                    using (new EditorGUILayout.VerticalScope())
-                    {
-                        if (category == Base.Category.Default)
-                        {
-                            EditorGUILayout.BeginHorizontal();
-                            var toggleLabelStyle = new GUIStyle(GUI.skin.label);
-                            toggleLabelStyle.margin = new RectOffset(2, 4, 0, 8);
-                            toggleLabelStyle.normal.textColor = Color.gray;
-                            GUILayout.Label("Toggle", toggleLabelStyle);
-                            GUILayout.FlexibleSpace();
-                            var blendshapeLabelStyle = new GUIStyle(GUI.skin.label);
-                            blendshapeLabelStyle.margin = new RectOffset(4, 16, 0, 8);
-                            blendshapeLabelStyle.normal.textColor = Color.gray;
-                            GUILayout.Label("Blendshape/Symmetric Toggles", blendshapeLabelStyle);
-                            EditorGUILayout.EndHorizontal();                            
-                            toggles["Mouth"].Draw(meshes);
-                            toggles["Hand"].Draw(meshes);
-                        }
-                        foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                        {
-                            if (socket.FootType == selectedFootType || socket.FootType == Base.FootType.Both)
-                            {
-                                toggles[socket.Name].Draw(meshes);
-                            }
-
-
-                        }
-                        /*
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            if (GUILayout.Button("Select All"))
-                            {
-                                foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                                {
-                                    toggles[socket.Name].On = true;
-                                }
-                            }
-
-                            if (GUILayout.Button("Deselect All"))
-                            {
-                                foreach (var socket in Wholesome.Base.SocketsInCategory(category))
-                                {
-                                    toggles[socket.Name].On = false;
-                                }
-                            }
-                        }*/
-                    }
-                    //EditorGUILayout.Space(16);
-                }
-            }
-
+        private void EndCategory()
+        {
+            EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-            //EditorGUILayout.Space(8);
+            EditorGUILayout.EndVertical(); // box
         }
     }
 }
