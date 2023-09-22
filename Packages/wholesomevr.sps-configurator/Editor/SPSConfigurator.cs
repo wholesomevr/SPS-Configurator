@@ -384,7 +384,7 @@ namespace Wholesome
                         var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
                         SetParentLocalPositionEulerAngles(socket.transform, leftAligned,
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
-                            @base.Hand.EulerAngles);
+                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)));
                         createdSockets.Add(socket);
                         menuMoves.Add(new MoveMenuItem
                         {
