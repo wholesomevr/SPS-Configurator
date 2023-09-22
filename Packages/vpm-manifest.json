@@ -11,11 +11,14 @@
     },
     "vrchat.blackstartx.gesture-manager": {
       "version": "3.8.6"
+    },
+    "com.vrchat.core.vpm-resolver": {
+      "version": "0.1.23"
     }
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.425.0",
+      "version": "1.435.0",
       "dependencies": {}
     },
     "com.vrchat.avatars": {
@@ -37,6 +40,10 @@
       "dependencies": {
         "com.vrchat.avatars": "3.2.x || 3.3.x"
       }
+    },
+    "com.vrchat.core.vpm-resolver": {
+      "version": "0.1.23",
+      "dependencies": {}
     }
   }
 }
