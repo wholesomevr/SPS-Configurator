@@ -340,11 +340,11 @@ namespace Wholesome
             var armatureScale = armature.localScale;
             var inverseArmatureScale = new Vector3(1 / armatureScale.x, 1 / armatureScale.y,
                 1 / armatureScale.z);
-            var hipLength = (humanToTransform["Spine"].position - humanToTransform["Hips"].position).magnitude;
+            var hipLength = humanToTransform["Spine"].localPosition.magnitude;
             var bakedScale = hipLength / @base.DefaultHipLength;
             if (selectedBase == 0) // Generic
             {
-                var torsoLength = (humanToTransform["Neck"].position - humanToTransform["Hips"].position).magnitude;
+                var torsoLength = humanToTransform["Hips"].InverseTransformPoint(humanToTransform["Neck"].position).magnitude;
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
 
