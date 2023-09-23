@@ -266,7 +266,7 @@ namespace Wholesome
         }
 
         private void SetSymmetricParent(GameObject gameObject, Transform leftTarget, Transform rightTarget,
-            Vector3 offsetPosition, Vector3 offsetRotation)
+            Vector3 offsetPosition, Vector3 offsetRotation, bool signLeft = false)
         {
             var parent = gameObject.AddComponent<ParentConstraint>();
             parent.AddSource(new ConstraintSource
@@ -280,7 +280,8 @@ namespace Wholesome
                 weight = 1
             });
             parent.SetTranslationOffset(0, offsetPosition);
-            parent.SetRotationOffset(0, offsetRotation);
+            parent.SetRotationOffset(0,
+                signLeft ? Vector3.Scale(offsetRotation, new Vector3(1, -1, 1)) : offsetRotation);
             parent.SetTranslationOffset(1, offsetPosition);
             parent.SetRotationOffset(1, offsetRotation);
             parent.locked = true;
@@ -340,11 +341,18 @@ namespace Wholesome
             var armatureScale = armature.localScale;
             var inverseArmatureScale = new Vector3(1 / armatureScale.x, 1 / armatureScale.y,
                 1 / armatureScale.z);
-            var hipLength = humanToTransform["Spine"].localPosition.magnitude;
+            var avatarScale = vrcAvatar.transform.localScale;
+            var inverseAvatarScale = new Vector3(1 / avatarScale.x, 1 / avatarScale.y,
+                1 / avatarScale.z);
+            var hipLength = Vector3.Scale(humanToTransform["Spine"].position - humanToTransform["Hips"].position,
+                inverseAvatarScale).magnitude;
+
+            // var hipLength = Vector3.Scale(humanToTransform["Spine"].localPosition, armatureScale).magnitude;
             var bakedScale = hipLength / @base.DefaultHipLength;
             if (selectedBase == 0) // Generic
             {
-                var torsoLength = humanToTransform["Hips"].InverseTransformPoint(humanToTransform["Neck"].position).magnitude;
+                var torsoLength = humanToTransform["Hips"].InverseTransformPoint(humanToTransform["Neck"].position)
+                    .magnitude;
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
 
@@ -411,7 +419,9 @@ namespace Wholesome
                     {
                         var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                         socket.transform.SetParent(humanToTransform["Hips"], false);
-                        SetSymmetricParent(socket.gameObject, leftAligned, rightAligned, Vector3.zero, Vector3.zero);
+                        SetSymmetricParent(socket.gameObject, leftAligned, rightAligned,
+                            Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
+                            @base.Hand.EulerAngles, true);
                         createdSockets.Add(socket);
                         menuMoves.Add(new MoveMenuItem
                         {
@@ -478,7 +488,7 @@ namespace Wholesome
                     socket.transform.SetParent(humanToTransform["Hips"], false);
                     SetSymmetricParent(socket.gameObject, humanToTransform["LeftUpperLeg"],
                         humanToTransform["RightUpperLeg"],
-                        Vector3.Scale(@base.Thighjob.Positon, inverseArmatureScale) * bakedScale,
+                        Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
                         @base.Thighjob.EulerAngles);
                     createdSockets.Add(socket);
                     menuMoves.Add(new MoveMenuItem
@@ -553,7 +563,7 @@ namespace Wholesome
                     var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                     socket.transform.SetParent(humanToTransform["Hips"], false);
                     SetSymmetricParent(socket.gameObject, humanToTransform["LeftFoot"], humanToTransform["RightFoot"],
-                        Vector3.Scale(footjobPosition, inverseArmatureScale) * bakedScale, footjobRotation);
+                        Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
                     createdSockets.Add(socket);
                     menuMoves.Add(new MoveMenuItem
                     {
