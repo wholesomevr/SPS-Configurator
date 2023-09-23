@@ -246,6 +246,13 @@ namespace Wholesome
             }
         }
 
+        private Vector3 GetAlignDelta(Transform transform)
+        {
+            var alignedX = Vector3.Cross(transform.up, Vector3.up);
+            var sign = Mathf.Sign(Vector3.Dot(transform.up, Vector3.right));
+            return new Vector3(0, sign * Vector3.Angle(transform.right, alignedX), 0);
+        }
+
         private Transform CreateAligned(Transform parent)
         {
             var aligned = new GameObject("Aligned");
@@ -284,6 +291,30 @@ namespace Wholesome
                 signLeft ? Vector3.Scale(offsetRotation, new Vector3(1, -1, 1)) : offsetRotation);
             parent.SetTranslationOffset(1, offsetPosition);
             parent.SetRotationOffset(1, offsetRotation);
+            parent.locked = true;
+            parent.constraintActive = true;
+        }
+
+        private void SetSymmetricParent2(GameObject gameObject, Transform leftTarget, Transform rightTarget,
+            Vector3 leftOffsetPosition, Vector3 leftOffsetRotation, Vector3 rightOffsetPosition,
+            Vector3 rightOffsetRotation)
+        {
+            var parent = gameObject.AddComponent<ParentConstraint>();
+            parent.AddSource(new ConstraintSource
+            {
+                sourceTransform = leftTarget.transform,
+                weight = 1
+            });
+            parent.AddSource(new ConstraintSource
+            {
+                sourceTransform = rightTarget.transform,
+                weight = 1
+            });
+            parent.SetTranslationOffset(0, leftOffsetPosition);
+            parent.SetRotationOffset(0,
+                leftOffsetRotation);
+            parent.SetTranslationOffset(1, rightOffsetPosition);
+            parent.SetRotationOffset(1, rightOffsetRotation);
             parent.locked = true;
             parent.constraintActive = true;
         }
@@ -385,14 +416,14 @@ namespace Wholesome
 
                 if (handjobOn)
                 {
-                    var leftAligned = CreateAligned(humanToTransform["LeftHand"]);
-                    var rightAligned = CreateAligned(humanToTransform["RightHand"]);
+                    var leftAlignDelta = GetAlignDelta(humanToTransform["LeftHand"]);
+                    var rightAlignDelta = GetAlignDelta(humanToTransform["RightHand"]);
                     if (handjobLeftOn)
                     {
                         var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
-                        SetParentLocalPositionEulerAngles(socket.transform, leftAligned,
+                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftHand"],
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
-                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)));
+                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
                         createdSockets.Add(socket);
                         menuMoves.Add(new MoveMenuItem
                         {
@@ -404,9 +435,9 @@ namespace Wholesome
                     if (handjobRightOn)
                     {
                         var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true);
-                        SetParentLocalPositionEulerAngles(socket.transform, rightAligned,
+                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightHand"],
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
-                            @base.Hand.EulerAngles);
+                            @base.Hand.EulerAngles + rightAlignDelta);
                         createdSockets.Add(socket);
                         menuMoves.Add(new MoveMenuItem
                         {
@@ -419,9 +450,11 @@ namespace Wholesome
                     {
                         var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                         socket.transform.SetParent(humanToTransform["Hips"], false);
-                        SetSymmetricParent(socket.gameObject, leftAligned, rightAligned,
+                        SetSymmetricParent2(socket.gameObject, humanToTransform["LeftHand"], humanToTransform["RightHand"],
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
-                            @base.Hand.EulerAngles, true);
+                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta,
+                            Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
+                            @base.Hand.EulerAngles + rightAlignDelta);
                         createdSockets.Add(socket);
                         menuMoves.Add(new MoveMenuItem
                         {
@@ -599,6 +632,7 @@ namespace Wholesome
                     }
                 }
             }
+
 
             var vrcFury = avatarGameObject.AddComponent<VRCFury>();
             vrcFury.config.features.AddRange(menuMoves);
