@@ -443,7 +443,7 @@ namespace Wholesome
 
                 if (analOn)
                 {
-                    var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, false);
+                    var socket = CreateSocket(AnalName, VRCFuryHapticSocket.AddLight.Hole, false);
                     SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
                         Vector3.Scale(@base.Anal.Positon, inverseArmatureScale) * bakedScale,
                         @base.Anal.EulerAngles);
@@ -456,46 +456,31 @@ namespace Wholesome
             {
                 if (titjobOn)
                 {
-                    var socket = CreateSocket(TitjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    var socket = CreateSocket($"Special/{TitjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                     SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Chest"],
                         Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Titjob.EulerAngles);
                     createdSockets.Add(socket);
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socket.name}",
-                        toPath = $"Sockets/Special/{socket.name}"
-                    });
                 }
 
                 if (assjobOn)
                 {
-                    var socket = CreateSocket(AssjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    var socket = CreateSocket($"Special/{AssjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                     SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
                         Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Assjob.EulerAngles);
                     createdSockets.Add(socket);
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socket.name}",
-                        toPath = $"Sockets/Special/{socket.name}"
-                    });
                 }
 
                 if (thighjobOn)
                 {
-                    var socket = CreateSocket(ThighjobName, VRCFuryHapticSocket.AddLight.Ring, false);
+                    var socket = CreateSocket($"Special/{ThighjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                     socket.transform.SetParent(humanToTransform["Hips"], false);
                     SetSymmetricParent(socket.gameObject, humanToTransform["LeftUpperLeg"],
                         humanToTransform["RightUpperLeg"],
                         Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
                         @base.Thighjob.EulerAngles);
                     createdSockets.Add(socket);
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socket.name}",
-                        toPath = $"Sockets/Special/{socket.name}"
-                    });
                 }
             }
 
@@ -518,30 +503,20 @@ namespace Wholesome
 
                     if (soleLeftOn)
                     {
-                        var socket = CreateSocket($"{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
+                        var socket = CreateSocket($"Feet/{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true);
                         SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftFoot"],
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
-                        menuMoves.Add(new MoveMenuItem
-                        {
-                            fromPath = $"Sockets/{socket.name}",
-                            toPath = $"Sockets/Feet/{socket.name}"
-                        });
                     }
 
                     if (soleRightOn)
                     {
-                        var socket = CreateSocket($"{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true);
+                        var socket = CreateSocket($"Feet/{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true);
                         SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightFoot"],
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
-                        menuMoves.Add(new MoveMenuItem
-                        {
-                            fromPath = $"Sockets/{socket.name}",
-                            toPath = $"Sockets/Feet/{socket.name}"
-                        });
                     }
                 }
 
@@ -560,16 +535,11 @@ namespace Wholesome
                         footjobRotation = @base.FootjobHeeled.EulerAngles;
                     }
 
-                    var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
+                    var socket = CreateSocket($"Feet/{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false);
                     socket.transform.SetParent(humanToTransform["Hips"], false);
                     SetSymmetricParent(socket.gameObject, humanToTransform["LeftFoot"], humanToTransform["RightFoot"],
                         Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
                     createdSockets.Add(socket);
-                    menuMoves.Add(new MoveMenuItem
-                    {
-                        fromPath = $"Sockets/{socket.name}",
-                        toPath = $"Sockets/Feet/{socket.name}"
-                    });
                 }
             }
 
@@ -601,7 +571,6 @@ namespace Wholesome
             }
 
             var vrcFury = avatarGameObject.AddComponent<VRCFury>();
-            vrcFury.config.features.AddRange(menuMoves);
             vrcFury.config.features.Add(new MoveMenuItem
             {
                 fromPath = "Sockets",
