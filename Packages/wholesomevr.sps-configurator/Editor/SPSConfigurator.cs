@@ -662,16 +662,6 @@ namespace Wholesome
                     {
                         Transform parent = socket.transform.parent;
                         Object.DestroyImmediate(socket.gameObject);
-                        if (parent.name == "Aligned")
-                        {
-                            if (parent.childCount == 0)
-                            {
-                                var destroy = parent;
-                                parent = parent.parent;
-                                Object.DestroyImmediate(destroy.gameObject);
-                            }
-                        }
-
                         if (parent.name == "SPS")
                         {
                             if (parent.childCount == 0)
