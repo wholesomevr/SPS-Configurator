@@ -18,7 +18,7 @@
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.435.0",
+      "version": "1.445.0",
       "dependencies": {}
     },
     "com.vrchat.avatars": {
@@ -42,7 +42,7 @@
       }
     },
     "com.vrchat.core.vpm-resolver": {
-      "version": "0.1.23",
+      "version": "0.1.24",
       "dependencies": {}
     }
   }
