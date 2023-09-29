@@ -666,6 +666,10 @@ namespace Wholesome
 
 
             var vrcFury = avatarGameObject.AddComponent<VRCFury>();
+            vrcFury.config.features.Add(new SetIcon()
+            {
+                path = "Sockets"
+            });
             vrcFury.config.features.AddRange(icons);
             vrcFury.config.features.Add(new SetIcon()
             {
@@ -734,7 +738,6 @@ namespace Wholesome
             }
 
             var furies = avatarGameObject.GetComponents<VRCFury>();
-            var hasMenuMove = false;
             string[] possiblePaths =
             {
                 "Sockets/Handjob", "Sockets/Special", "Sockets/Feet"
@@ -785,7 +788,6 @@ namespace Wholesome
             }
 
             var furies = avatarGameObject.GetComponents<VRCFury>();
-            var hasMenuMove = false;
             var possiblePaths = socketNames.Select(name => $"Sockets/{name}").ToList();
             foreach (var vrcFury in furies)
             {
