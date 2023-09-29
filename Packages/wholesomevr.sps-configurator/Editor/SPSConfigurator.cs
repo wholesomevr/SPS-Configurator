@@ -75,7 +75,7 @@ namespace Wholesome
         {
             var window = GetWindow(typeof(SPSConfigurator));
             window.titleContent = new GUIContent("SPS Configurator");
-            window.minSize = new Vector2(490, 600);
+            window.minSize = new Vector2(490, 700);
             window.Show();
         }
 
@@ -106,12 +106,13 @@ namespace Wholesome
             {
                 new Ray(origin, Vector3.back), mesh, head.transform.localToWorldMatrix, null
             };
-            var result = (bool) intersect.Invoke(null, rayParams);
+            var result = (bool)intersect.Invoke(null, rayParams);
             RaycastHit hit = (RaycastHit)rayParams[3];
             new GameObject("hit").transform.position = hit.point;
-            
+
             Debug.Log(result);
-            if (result && Vector3.Distance(weightedPos, hit.point) < 0.03 && headBone.InverseTransformPoint(hit.point).x < 0.01)
+            if (result && Vector3.Distance(weightedPos, hit.point) < 0.03 &&
+                headBone.InverseTransformPoint(hit.point).x < 0.01)
             {
                 return hit.point;
             }
@@ -157,7 +158,8 @@ namespace Wholesome
                     selectedAvatar = gameObject.GetComponent<VRCAvatarDescriptor>();
                     if (selectedAvatar == null)
                     {
-                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault(); // TODO: use last?
+                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true)
+                            .FirstOrDefault(); // TODO: use last?
                     }
                 }
 
@@ -342,7 +344,8 @@ namespace Wholesome
             parent.constraintActive = true;
         }
 
-        public VRCFuryHapticSocket CreateSocket(string name, VRCFuryHapticSocket.AddLight light, bool auto, string category = null)
+        public VRCFuryHapticSocket CreateSocket(string name, VRCFuryHapticSocket.AddLight light, bool auto,
+            string category = null)
         {
             var gameObject = new GameObject(name);
             var socketVrcf = gameObject.AddComponent<VRCFuryHapticSocket>();
@@ -443,7 +446,8 @@ namespace Wholesome
                     var rightAlignDelta = GetAlignDelta(humanToTransform["RightHand"]);
                     if (handjobLeftOn)
                     {
-                        var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true, "Handjob");
+                        var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true,
+                            "Handjob");
                         SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftHand"],
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
@@ -452,7 +456,8 @@ namespace Wholesome
 
                     if (handjobRightOn)
                     {
-                        var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true, "Handjob");
+                        var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true,
+                            "Handjob");
                         SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightHand"],
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             @base.Hand.EulerAngles + rightAlignDelta);
@@ -461,9 +466,11 @@ namespace Wholesome
 
                     if (handjobBothOn)
                     {
-                        var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false, "Handjob");
+                        var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false,
+                            "Handjob");
                         socket.transform.SetParent(humanToTransform["Hips"], false);
-                        SetSymmetricParent2(socket.gameObject, humanToTransform["LeftHand"], humanToTransform["RightHand"],
+                        SetSymmetricParent2(socket.gameObject, humanToTransform["LeftHand"],
+                            humanToTransform["RightHand"],
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
                             Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta,
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
@@ -650,8 +657,10 @@ namespace Wholesome
         {
             string[] socketNames =
             {
-                BlowjobName, $"Handjob/{HandjobName} Right", $"Handjob/{HandjobName} Left", $"Handjob/Double {HandjobName}", PussyName,
-                AnalName, $"Special/{TitjobName}", $"Special/{AssjobName}", $"Special/{ThighjobName}", $"Feet/{SoleName} Left", $"Feet/{SoleName} Right",
+                BlowjobName, $"Handjob/{HandjobName} Right", $"Handjob/{HandjobName} Left",
+                $"Handjob/Double {HandjobName}", PussyName,
+                AnalName, $"Special/{TitjobName}", $"Special/{AssjobName}", $"Special/{ThighjobName}",
+                $"Feet/{SoleName} Left", $"Feet/{SoleName} Right",
                 $"Feet/{FootjobName}"
             };
             var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
@@ -833,6 +842,8 @@ namespace Wholesome
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
 
+            DrawParameterEstimation(selectedAvatar);
+
             EditorGUILayout.Space(16);
 
             using (new EditorGUILayout.HorizontalScope())
@@ -967,9 +978,109 @@ namespace Wholesome
 
         private void EndCategory()
         {
+            GUI.enabled = true;
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndVertical(); // box
+        }
+
+        private const int GENERAL_SPS_COST = 1;
+        private const int SINGLE_SPS_COST = 1;
+
+        private void DrawParameterEstimation(VRCAvatarDescriptor avatar)
+        {
+            var avatarCost = avatar?.expressionParameters?.CalcTotalCost() ?? 0;
+            var spsCost = GENERAL_SPS_COST;
+            if (defaultOn)
+            {
+                if (blowjobOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+
+                if (handjobOn)
+                {
+                    if (handjobLeftOn)
+                    {
+                        spsCost += SINGLE_SPS_COST;
+                    }
+
+                    if (handjobRightOn)
+                    {
+                        spsCost += SINGLE_SPS_COST;
+                    }
+
+                    if (handjobBothOn)
+                    {
+                        spsCost += SINGLE_SPS_COST;
+                    }
+                }
+
+                if (pussyOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+
+                if (analOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+            }
+
+            if (specialOn)
+            {
+                if (titjobOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+
+                if (assjobOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+
+                if (thighjobOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+            }
+
+            if (feetOn)
+            {
+                if (soleOn)
+                {
+                    if (soleLeftOn)
+                    {
+                        spsCost += SINGLE_SPS_COST;
+                    }
+
+                    if (soleRightOn)
+                    {
+                        spsCost += SINGLE_SPS_COST;
+                    }
+                }
+
+                if (footjobOn)
+                {
+                    spsCost += SINGLE_SPS_COST;
+                }
+            }
+
+            var resultCost = avatarCost + spsCost;
+            var style = new GUIStyle(GUI.skin.box);
+            style.normal.background = style.normal.scaledBackgrounds[0];
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            var labelStyle = new GUIStyle(EditorStyles.boldLabel) { margin = new RectOffset(8, 8, 8, 8) };
+            GUILayout.Label("Paramaters", labelStyle);
+            var parametersStyle = new GUIStyle(GUI.skin.box) { margin = new RectOffset(8, 8, 8, 8), padding = new RectOffset(8, 8, 8, 8)};
+            EditorGUILayout.BeginVertical(parametersStyle);
+            EditorGUILayout.LabelField("Avatar:", avatarCost.ToString());
+            EditorGUILayout.LabelField("SPS:", spsCost.ToString());
+            var totalStyle = new GUIStyle(GUI.skin.label) { richText = true };
+            var color = resultCost > 256 ? "red" : "lime";
+            EditorGUILayout.LabelField("Total Memory:", $"<color={color}>{resultCost}</color>/256", totalStyle);
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndVertical();
         }
     }
 }
