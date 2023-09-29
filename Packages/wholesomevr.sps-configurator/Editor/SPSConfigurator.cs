@@ -104,13 +104,11 @@ namespace Wholesome
             // TODO: relative to head rotation
             object[] rayParams =
             {
-                new Ray(origin, Vector3.back), mesh, head.transform.localToWorldMatrix, null
+                new Ray(origin, headBone.transform.TransformVector(Vector3.back)), mesh, head.localToWorldMatrix, null
             };
             var result = (bool)intersect.Invoke(null, rayParams);
             RaycastHit hit = (RaycastHit)rayParams[3];
             new GameObject("hit").transform.position = hit.point;
-
-            Debug.Log(result);
             if (result && Vector3.Distance(weightedPos, hit.point) < 0.03 &&
                 headBone.InverseTransformPoint(hit.point).x < 0.01)
             {
@@ -413,7 +411,7 @@ namespace Wholesome
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
 
-            var menuMoves = new List<MoveMenuItem>();
+            var icons = new List<SetIcon>();
             var createdSockets = new List<VRCFuryHapticSocket>();
             if (defaultOn)
             {
@@ -438,6 +436,10 @@ namespace Wholesome
                         Vector3.zero);
                     AddBlendshape(socket, blowjobBlendshape.ToString());
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
 
                 if (handjobOn)
@@ -452,6 +454,10 @@ namespace Wholesome
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
                         createdSockets.Add(socket);
+                        icons.Add(new SetIcon()
+                        {
+                            path = $"Sockets/{socket.name}"
+                        });
                     }
 
                     if (handjobRightOn)
@@ -462,6 +468,10 @@ namespace Wholesome
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             @base.Hand.EulerAngles + rightAlignDelta);
                         createdSockets.Add(socket);
+                        icons.Add(new SetIcon()
+                        {
+                            path = $"Sockets/{socket.name}"
+                        });
                     }
 
                     if (handjobBothOn)
@@ -476,6 +486,10 @@ namespace Wholesome
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
                             @base.Hand.EulerAngles + rightAlignDelta);
                         createdSockets.Add(socket);
+                        icons.Add(new SetIcon()
+                        {
+                            path = $"Sockets/{socket.name}"
+                        });
                     }
                 }
 
@@ -487,6 +501,10 @@ namespace Wholesome
                         @base.Pussy.EulerAngles);
                     AddBlendshape(socket, pussyBlendshape.ToString());
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
 
                 if (analOn)
@@ -497,6 +515,10 @@ namespace Wholesome
                         @base.Anal.EulerAngles);
                     AddBlendshape(socket, analBlendshape.ToString());
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
             }
 
@@ -509,6 +531,10 @@ namespace Wholesome
                         Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Titjob.EulerAngles);
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
 
                 if (assjobOn)
@@ -518,6 +544,10 @@ namespace Wholesome
                         Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Assjob.EulerAngles);
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
 
                 if (thighjobOn)
@@ -529,10 +559,9 @@ namespace Wholesome
                         Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
                         @base.Thighjob.EulerAngles);
                     createdSockets.Add(socket);
-                    menuMoves.Add(new MoveMenuItem
+                    icons.Add(new SetIcon()
                     {
-                        fromPath = $"Sockets/{socket.name}",
-                        toPath = $"Sockets/Special/{socket.name}"
+                        path = $"Sockets/{socket.name}"
                     });
                 }
             }
@@ -561,6 +590,10 @@ namespace Wholesome
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
+                        icons.Add(new SetIcon()
+                        {
+                            path = $"Sockets/{socket.name}"
+                        });
                     }
 
                     if (soleRightOn)
@@ -570,6 +603,10 @@ namespace Wholesome
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
+                        icons.Add(new SetIcon()
+                        {
+                            path = $"Sockets/{socket.name}"
+                        });
                     }
                 }
 
@@ -593,6 +630,10 @@ namespace Wholesome
                     SetSymmetricParent(socket.gameObject, humanToTransform["LeftFoot"], humanToTransform["RightFoot"],
                         Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
                     createdSockets.Add(socket);
+                    icons.Add(new SetIcon()
+                    {
+                        path = $"Sockets/{socket.name}"
+                    });
                 }
             }
 
@@ -625,11 +666,19 @@ namespace Wholesome
 
 
             var vrcFury = avatarGameObject.AddComponent<VRCFury>();
-            /*vrcFury.config.features.Add(new SetIcon()
+            vrcFury.config.features.AddRange(icons);
+            vrcFury.config.features.Add(new SetIcon()
             {
-                path = "Sockets/Handjob",
-                icon = AssetDatabase.LoadAssetAtPath<Texture2D>("Packages/com.vrchat.avatars/Samples/AV3 Demo Assets/Expressions Menu/Icons/hand_normal.png")
-            });*/
+                path = "Sockets/Handjob"
+            });
+            vrcFury.config.features.Add(new SetIcon()
+            {
+                path = "Sockets/Special"
+            });
+            vrcFury.config.features.Add(new SetIcon()
+            {
+                path = "Sockets/Feet"
+            });
             // Reorder
             vrcFury.config.features.Add(new MoveMenuItem()
             {
