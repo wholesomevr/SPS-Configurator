@@ -816,7 +816,6 @@ namespace Wholesome
             DrawBlendshapeToggle(meshes, BlowjobName, ref blowjobOn, blowjobBlendshape);
             DrawSymmetricBothToggle(HandjobName, ref handjobOn, ref handjobLeftOn, ref handjobRightOn,
                 ref handjobBothOn);
-            pussyOn = EditorGUILayout.ToggleLeft(PussyName, pussyOn);
             DrawBlendshapeToggle(meshes, PussyName, ref pussyOn, pussyBlendshape);
             DrawBlendshapeToggle(meshes, AnalName, ref analOn, analBlendshape);
             EndCategory();
