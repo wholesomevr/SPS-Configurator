@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Numerics;
+using System.Reflection;
 using System.Text;
 using UnityEngine;
 using UnityEditor;
@@ -78,7 +79,7 @@ namespace Wholesome
             window.Show();
         }
 
-        public static Vector3 DetectMouthPosition(SkinnedMeshRenderer head, int ohBlendshapeIndex)
+        public static Vector3 DetectMouthPosition(SkinnedMeshRenderer head, int ohBlendshapeIndex, Transform headBone)
         {
             var mesh = head.sharedMesh;
             var frames = head.sharedMesh.GetBlendShapeFrameCount(ohBlendshapeIndex);
@@ -94,8 +95,30 @@ namespace Wholesome
                 .Aggregate(new Vector3(), (wpSum, wp) => wpSum + wp, (wp) => wp);
             Debug.Assert(Mathf.Abs(weightedPos.x) < 0.01, "Blendshape not symmetric");
             weightedPos = head.localToWorldMatrix.MultiplyPoint(weightedPos);
+            var weightedPosLocal = headBone.InverseTransformPoint(weightedPos);
+            var originLocal = weightedPosLocal + new Vector3(0, 0, 0.1f);
+            var origin = headBone.TransformPoint(originLocal);
             //weightedPos = new Vector3(0, weightedPos.z, -weightedPos.y); // TODO: Handle all possible head transformations
-            return weightedPos;
+            var intersect = typeof(HandleUtility).GetMethod("IntersectRayMesh",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
+            // TODO: relative to head rotation
+            object[] rayParams =
+            {
+                new Ray(origin, Vector3.back), mesh, head.transform.localToWorldMatrix, null
+            };
+            var result = (bool) intersect.Invoke(null, rayParams);
+            RaycastHit hit = (RaycastHit)rayParams[3];
+            new GameObject("hit").transform.position = hit.point;
+            
+            Debug.Log(result);
+            if (result && Vector3.Distance(weightedPos, hit.point) < 0.03 && headBone.InverseTransformPoint(hit.point).x < 0.01)
+            {
+                return hit.point;
+            }
+            else
+            {
+                return weightedPos;
+            }
         }
 
 
@@ -134,7 +157,7 @@ namespace Wholesome
                     selectedAvatar = gameObject.GetComponent<VRCAvatarDescriptor>();
                     if (selectedAvatar == null)
                     {
-                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault();
+                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault(); // TODO: use last?
                     }
                 }
 
@@ -402,7 +425,7 @@ namespace Wholesome
                             mouthPosition = humanToTransform["Head"].InverseTransformPoint(DetectMouthPosition(
                                 vrcAvatar.VisemeSkinnedMesh,
                                 vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                    visemOhBlendshapeName)));
+                                    visemOhBlendshapeName), humanToTransform["Head"]));
                         }
                     }
 
@@ -871,7 +894,7 @@ namespace Wholesome
                                 SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
                             var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
                                 SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                    visemOhBlendshapeName));
+                                    visemOhBlendshapeName), humanToTransform["Head"]);
                             var position = mouthPosition + new Vector3(0, 0, 0.3f);
                             initiatedPrefab.transform.SetPositionAndRotation(position,
                                 Quaternion.AngleAxis(-180, Vector3.left));
