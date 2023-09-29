@@ -108,7 +108,6 @@ namespace Wholesome
             };
             var result = (bool)intersect.Invoke(null, rayParams);
             RaycastHit hit = (RaycastHit)rayParams[3];
-            new GameObject("hit").transform.position = hit.point;
             if (result && Vector3.Distance(weightedPos, hit.point) < 0.03 &&
                 headBone.InverseTransformPoint(hit.point).x < 0.01)
             {
