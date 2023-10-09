@@ -747,7 +747,7 @@ namespace Wholesome
                 vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && m.fromPath == "Sockets");
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
-                vrcFury.config.features.RemoveAll(feature => feature is SetIcon i && possibleIcons.Contains(i.path));
+                vrcFury.config.features.RemoveAll(feature => feature is SetIcon i && (possibleIcons.Contains(i.path) || i.path == "Sockets"));
                 if (vrcFury.config.features.Count == 0)
                 {
                     Object.DestroyImmediate(vrcFury);
