@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.Animations;
 using VF.Component;
+using VF.Inspector;
 using VF.Model;
 using VF.Model.Feature;
 using VF.Model.StateAction;
@@ -69,13 +70,14 @@ namespace Wholesome
         private bool soleRightOn = true;
         private bool footjobOn = true;
         private SkinnedMeshRenderer[] meshes;
+        private string spsMenuPath = "SPS";
 
         [MenuItem("Tools/Wholesome/SPS Configurator")]
         public static void Open()
         {
             var window = GetWindow(typeof(SPSConfigurator));
             window.titleContent = new GUIContent("SPS Configurator");
-            window.minSize = new Vector2(490, 700);
+            window.minSize = new Vector2(490, 732);
             window.Show();
         }
 
@@ -665,43 +667,38 @@ namespace Wholesome
 
 
             var vrcFury = avatarGameObject.AddComponent<VRCFury>();
-            vrcFury.config.features.Add(new SetIcon()
+            vrcFury.config.features.Add(new SpsOptions()
             {
-                path = "Sockets"
-            });
-            vrcFury.config.features.AddRange(icons);
-            vrcFury.config.features.Add(new SetIcon()
-            {
-                path = "Sockets/Handjob"
+                //menuIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Packages/com.vrcfury.vrcfury/VrcfResources/sps_icon.png"),
+                menuPath = spsMenuPath
             });
             vrcFury.config.features.Add(new SetIcon()
             {
-                path = "Sockets/Special"
+                path = $"{spsMenuPath}/Handjob"
             });
             vrcFury.config.features.Add(new SetIcon()
             {
-                path = "Sockets/Feet"
+                path = $"{spsMenuPath}/Special"
+            });
+            vrcFury.config.features.Add(new SetIcon()
+            {
+                path = $"{spsMenuPath}/Feet"
             });
             // Reorder
             vrcFury.config.features.Add(new MoveMenuItem()
             {
-                fromPath = "Sockets/Handjob",
-                toPath = "Sockets/Handjob"
+                fromPath = $"{spsMenuPath}/Handjob",
+                toPath = $"{spsMenuPath}/Handjob"
             });
             vrcFury.config.features.Add(new MoveMenuItem()
             {
-                fromPath = "Sockets/Special",
-                toPath = "Sockets/Special"
+                fromPath = $"{spsMenuPath}/Special",
+                toPath = $"{spsMenuPath}/Special"
             });
             vrcFury.config.features.Add(new MoveMenuItem()
             {
-                fromPath = "Sockets/Feet",
-                toPath = "Sockets/Feet"
-            });
-            vrcFury.config.features.Add(new MoveMenuItem
-            {
-                fromPath = "Sockets",
-                toPath = "SPS"
+                fromPath = $"{spsMenuPath}/Feet",
+                toPath = $"{spsMenuPath}/Feet"
             });
         }
 
@@ -739,15 +736,20 @@ namespace Wholesome
             var furies = avatarGameObject.GetComponents<VRCFury>();
             string[] possiblePaths =
             {
-                "Sockets/Handjob", "Sockets/Special", "Sockets/Feet"
+                "Socket/Handjob", "Socket/Special", "Socket/Feet", "SPS/Handjob", "SPS/Special", "SPS/Feet"
             };
-            var possibleIcons = socketNames.Select(name => $"Sockets/{name}").Concat(possiblePaths).ToList();
+            var possibleIcons = socketNames.SelectMany(name =>
+                new []
+                {
+                    $"SPS/{name}", $"Sockets/{name}"
+                }).Concat(possiblePaths).ToList();
             foreach (var vrcFury in furies)
             {
-                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && m.fromPath == "Sockets");
+                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
-                vrcFury.config.features.RemoveAll(feature => feature is SetIcon i && (possibleIcons.Contains(i.path) || i.path == "Sockets"));
+                vrcFury.config.features.RemoveAll(feature =>
+                    feature is SetIcon i && (possibleIcons.Contains(i.path) || i.path == "SPS" || i.path == "Sockets"));
                 if (vrcFury.config.features.Count == 0)
                 {
                     Object.DestroyImmediate(vrcFury);
@@ -759,6 +761,7 @@ namespace Wholesome
         public static void Clear(GameObject avatarGameObject)
         {
             Clear2(avatarGameObject);
+            Clear3(avatarGameObject);
             string[] socketNames =
             {
                 BlowjobName, $"{HandjobName} Right", $"{HandjobName} Left", $"Double {HandjobName}", PussyName,
@@ -787,12 +790,72 @@ namespace Wholesome
             }
 
             var furies = avatarGameObject.GetComponents<VRCFury>();
-            var possiblePaths = socketNames.Select(name => $"Sockets/{name}").ToList();
+            var possiblePaths = socketNames.SelectMany(name =>
+                new []
+                {
+                    $"SPS/{name}", $"Sockets/{name}"
+                }).ToList();
             foreach (var vrcFury in furies)
             {
-                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && m.fromPath == "Sockets");
+                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
+                if (vrcFury.config.features.Count == 0)
+                {
+                    Object.DestroyImmediate(vrcFury);
+                }
+            }
+        }
+
+        public static void Clear3(GameObject avatarGameObject)
+        {
+            string[] socketNames =
+            {
+                BlowjobName, $"Handjob/{HandjobName} Right", $"Handjob/{HandjobName} Left",
+                $"Handjob/Double {HandjobName}", PussyName,
+                AnalName, $"Special/{TitjobName}", $"Special/{AssjobName}", $"Special/{ThighjobName}",
+                $"Feet/{SoleName} Left", $"Feet/{SoleName} Right",
+                $"Feet/{FootjobName}"
+            };
+            var sockets = avatarGameObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
+
+            foreach (var socket in sockets)
+            {
+                if (socket != null)
+                {
+                    if (socketNames.Contains(socket.name))
+                    {
+                        Transform parent = socket.transform.parent;
+                        Object.DestroyImmediate(socket.gameObject);
+                        if (parent.name == "SPS")
+                        {
+                            if (parent.childCount == 0)
+                            {
+                                Object.DestroyImmediate(parent.gameObject);
+                            }
+                        }
+                    }
+                }
+            }
+
+            var furies = avatarGameObject.GetComponents<VRCFury>();
+            
+            foreach (var vrcFury in furies)
+            {
+                var spsPaths = vrcFury.config.features.Where(feature => feature is SpsOptions)
+                    .Select(feature => (feature as SpsOptions).menuPath).ToList();
+                foreach (var spsPath in spsPaths)
+                {
+                    string[] possiblePaths =
+                    {
+                        $"{spsPath}/Handjob", $"{spsPath}/Special", $"{spsPath}/Feet"
+                    };
+                    vrcFury.config.features.RemoveAll(feature =>
+                        feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
+                    vrcFury.config.features.RemoveAll(feature =>
+                        feature is SetIcon i && possiblePaths.Contains(i.path));
+                }
+                vrcFury.config.features.RemoveAll(feature => feature is SpsOptions sps);
                 if (vrcFury.config.features.Count == 0)
                 {
                     Object.DestroyImmediate(vrcFury);
@@ -893,6 +956,12 @@ namespace Wholesome
             EditorGUILayout.EndVertical();
 
             DrawParameterEstimation(selectedAvatar);
+
+            var pathStyle = new GUIStyle(GUI.skin.textField)
+            {
+                margin = new RectOffset(16, 16, 8, 8)
+            };
+            spsMenuPath = EditorGUILayout.TextField("SPS Menu Path:", spsMenuPath, pathStyle);
 
             EditorGUILayout.Space(16);
 
@@ -1122,7 +1191,8 @@ namespace Wholesome
             EditorGUILayout.BeginVertical(GUI.skin.box);
             var labelStyle = new GUIStyle(EditorStyles.boldLabel) { margin = new RectOffset(8, 8, 8, 8) };
             GUILayout.Label("Paramaters", labelStyle);
-            var parametersStyle = new GUIStyle(GUI.skin.box) { margin = new RectOffset(8, 8, 8, 8), padding = new RectOffset(8, 8, 8, 8)};
+            var parametersStyle = new GUIStyle(GUI.skin.box)
+                { margin = new RectOffset(8, 8, 8, 8), padding = new RectOffset(8, 8, 8, 8) };
             EditorGUILayout.BeginVertical(parametersStyle);
             EditorGUILayout.LabelField("Avatar:", avatarCost.ToString());
             EditorGUILayout.LabelField("SPS:", spsCost.ToString());
