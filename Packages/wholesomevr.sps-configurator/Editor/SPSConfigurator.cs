@@ -736,7 +736,7 @@ namespace Wholesome
             var furies = avatarGameObject.GetComponents<VRCFury>();
             string[] possiblePaths =
             {
-                "Socket/Handjob", "Socket/Special", "Socket/Feet", "SPS/Handjob", "SPS/Special", "SPS/Feet"
+                "Sockets/Handjob", "Sockets/Special", "Sockets/Feet", "SPS/Handjob", "SPS/Special", "SPS/Feet"
             };
             var possibleIcons = socketNames.SelectMany(name =>
                 new []
