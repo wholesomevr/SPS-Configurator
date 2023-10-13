@@ -15,6 +15,7 @@ using VF.Model.Feature;
 using VF.Model.StateAction;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
+using Action = VF.Model.StateAction.Action;
 using Object = UnityEngine.Object;
 using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
@@ -71,13 +72,17 @@ namespace Wholesome
         private bool footjobOn = true;
         private SkinnedMeshRenderer[] meshes;
         private string spsMenuPath = "SPS";
+        private bool experimentalFoldout = false;
+        private bool sfxOn = false;
+        private bool sfxPussyOn = true;
+        private bool sfxAnalOn = true;
 
         [MenuItem("Tools/Wholesome/SPS Configurator")]
         public static void Open()
         {
             var window = GetWindow(typeof(SPSConfigurator));
             window.titleContent = new GUIContent("SPS Configurator");
-            window.minSize = new Vector2(490, 732);
+            window.minSize = new Vector2(490, 790);
             window.Show();
         }
 
@@ -506,6 +511,19 @@ namespace Wholesome
                     {
                         path = $"Sockets/{socket.name}"
                     });
+                    if (sfxOn && sfxPussyOn)
+                    {
+                        var sfx = PrefabUtility.InstantiatePrefab(
+                            AssetDatabase.LoadAssetAtPath<GameObject>(
+                                "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                            socket.transform) as GameObject;
+                        socket.enableActiveAnimation = true;
+                        socket.activeActions = new State();
+                        socket.activeActions.actions.Add(new ObjectToggleAction
+                        {
+                            obj = sfx
+                        });
+                    }
                 }
 
                 if (analOn)
@@ -520,6 +538,19 @@ namespace Wholesome
                     {
                         path = $"Sockets/{socket.name}"
                     });
+                    if (sfxOn && sfxAnalOn)
+                    {
+                        var sfx = PrefabUtility.InstantiatePrefab(
+                            AssetDatabase.LoadAssetAtPath<GameObject>(
+                                "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                            socket.transform) as GameObject;
+                        socket.enableActiveAnimation = true;
+                        socket.activeActions = new State();
+                        socket.activeActions.actions.Add(new ObjectToggleAction
+                        {
+                            obj = sfx
+                        });
+                    }
                 }
             }
 
@@ -700,6 +731,22 @@ namespace Wholesome
                 fromPath = $"{spsMenuPath}/Feet",
                 toPath = $"{spsMenuPath}/Feet"
             });
+            if (sfxOn && (sfxPussyOn || sfxAnalOn))
+            {
+                var state = new State();
+                state.actions.Add(new FxFloatAction()
+                {
+                    name = "WH_SFX_On",
+                    value = 1
+                });
+                vrcFury.config.features.Add(new Toggle()
+                {
+                    name = $"{spsMenuPath}/Options/Sound FX",
+                    state = state,
+                    saved = true,
+                    defaultOn = true
+                });
+            }
         }
 
         public static void Clear2(GameObject avatarGameObject)
@@ -739,13 +786,14 @@ namespace Wholesome
                 "Sockets/Handjob", "Sockets/Special", "Sockets/Feet", "SPS/Handjob", "SPS/Special", "SPS/Feet"
             };
             var possibleIcons = socketNames.SelectMany(name =>
-                new []
+                new[]
                 {
                     $"SPS/{name}", $"Sockets/{name}"
                 }).Concat(possiblePaths).ToList();
             foreach (var vrcFury in furies)
             {
-                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
+                vrcFury.config.features.RemoveAll(feature =>
+                    feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
                 vrcFury.config.features.RemoveAll(feature =>
@@ -791,13 +839,14 @@ namespace Wholesome
 
             var furies = avatarGameObject.GetComponents<VRCFury>();
             var possiblePaths = socketNames.SelectMany(name =>
-                new []
+                new[]
                 {
                     $"SPS/{name}", $"Sockets/{name}"
                 }).ToList();
             foreach (var vrcFury in furies)
             {
-                vrcFury.config.features.RemoveAll(feature => feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
+                vrcFury.config.features.RemoveAll(feature =>
+                    feature is MoveMenuItem m && (m.fromPath == "SPS" || m.fromPath == "Sockets"));
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
                 if (vrcFury.config.features.Count == 0)
@@ -839,7 +888,7 @@ namespace Wholesome
             }
 
             var furies = avatarGameObject.GetComponents<VRCFury>();
-            
+
             foreach (var vrcFury in furies)
             {
                 var spsPaths = vrcFury.config.features.Where(feature => feature is SpsOptions)
@@ -848,13 +897,16 @@ namespace Wholesome
                 {
                     string[] possiblePaths =
                     {
-                        $"{spsPath}/Handjob", $"{spsPath}/Special", $"{spsPath}/Feet"
+                        $"{spsPath}/Handjob", $"{spsPath}/Special", $"{spsPath}/Feet",
                     };
                     vrcFury.config.features.RemoveAll(feature =>
                         feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
                     vrcFury.config.features.RemoveAll(feature =>
                         feature is SetIcon i && possiblePaths.Contains(i.path));
+                    vrcFury.config.features.RemoveAll(feature =>
+                        feature is Toggle t && t.name == $"{spsPath}/Options/Sound FX");
                 }
+
                 vrcFury.config.features.RemoveAll(feature => feature is SpsOptions sps);
                 if (vrcFury.config.features.Count == 0)
                 {
@@ -931,7 +983,11 @@ namespace Wholesome
             selectedFootType = (FootType)GUILayout.Toolbar((int)selectedFootType, new[] { "Flat", "Heeled" });
 
             EditorGUILayout.Space();
-
+            var pathStyle = new GUIStyle(GUI.skin.textField)
+            {
+                margin = new RectOffset(16, 16, 8, 8)
+            };
+            spsMenuPath = EditorGUILayout.TextField("SPS Menu Path:", spsMenuPath, pathStyle);
             EditorGUILayout.BeginVertical();
             BeginCategory("Default", ref defaultOn);
             DrawLabels();
@@ -954,15 +1010,20 @@ namespace Wholesome
             EndCategory();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-
+            BeginCategory("Sound FX (Experimental)", ref sfxOn);
+            EditorGUILayout.BeginHorizontal();
+            sfxPussyOn = EditorGUILayout.ToggleLeft(PussyName, sfxPussyOn);
+            sfxAnalOn = EditorGUILayout.ToggleLeft(AnalName, sfxAnalOn);
+            EditorGUILayout.EndHorizontal();
+            EndCategory();
             DrawParameterEstimation(selectedAvatar);
-
-            var pathStyle = new GUIStyle(GUI.skin.textField)
+            /*
+            if ((experimentalFoldout = BeginExperimental(experimentalFoldout)))
             {
-                margin = new RectOffset(16, 16, 8, 8)
-            };
-            spsMenuPath = EditorGUILayout.TextField("SPS Menu Path:", spsMenuPath, pathStyle);
-
+                EditorGUILayout.ToggleLeft("Sound FX", false);
+            }
+            EndExperimental();
+            */
             EditorGUILayout.Space(16);
 
             using (new EditorGUILayout.HorizontalScope())
@@ -1102,6 +1163,29 @@ namespace Wholesome
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndVertical(); // box
         }
+
+        private bool BeginExperimental(bool foldout)
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            var style = new GUIStyle(GUI.skin.box);
+            style.normal.background = style.normal.scaledBackgrounds[0];
+            EditorGUILayout.BeginVertical(style);
+            foldout = EditorGUILayout.Foldout(foldout, "Experimental");
+            EditorGUILayout.EndVertical();
+            var togglesStyle = new GUIStyle(GUI.skin.label);
+            togglesStyle.padding = new RectOffset(8, 8, 8, 8);
+            EditorGUILayout.BeginHorizontal(togglesStyle);
+            EditorGUILayout.BeginVertical();
+            return foldout;
+        }
+
+        private void EndExperimental()
+        {
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.EndVertical(); // box
+        }
+
 
         private const int GENERAL_SPS_COST = 1;
         private const int SINGLE_SPS_COST = 1;
