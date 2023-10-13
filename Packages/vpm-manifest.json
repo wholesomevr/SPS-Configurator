@@ -14,21 +14,24 @@
     },
     "com.vrchat.core.vpm-resolver": {
       "version": "0.1.23"
+    },
+    "lyuma.av3emulator": {
+      "version": "3.2.3"
     }
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.464.0",
+      "version": "1.469.0",
       "dependencies": {}
     },
     "com.vrchat.avatars": {
-      "version": "3.3.0",
+      "version": "3.4.0",
       "dependencies": {
-        "com.vrchat.base": "3.3.0"
+        "com.vrchat.base": "3.4.0"
       }
     },
     "com.vrchat.base": {
-      "version": "3.3.0",
+      "version": "3.4.0",
       "dependencies": {}
     },
     "com.poiyomi.toon": {
@@ -44,6 +47,12 @@
     "com.vrchat.core.vpm-resolver": {
       "version": "0.1.24",
       "dependencies": {}
+    },
+    "lyuma.av3emulator": {
+      "version": "3.2.3",
+      "dependencies": {
+        "com.vrchat.avatars": ">=3.1.0 <3.5.0"
+      }
     }
   }
 }
