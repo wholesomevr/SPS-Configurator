@@ -733,18 +733,13 @@ namespace Wholesome
             });
             if (sfxOn && (sfxPussyOn || sfxAnalOn))
             {
-                var state = new State();
-                state.actions.Add(new FxFloatAction()
-                {
-                    name = "WH_SFX_On",
-                    value = 1
-                });
                 vrcFury.config.features.Add(new Toggle()
                 {
                     name = $"{spsMenuPath}/Options/Sound FX",
-                    state = state,
                     saved = true,
-                    defaultOn = true
+                    defaultOn = true,
+                    useGlobalParam = true,
+                    globalParam = "WH_SFX_On"
                 });
             }
         }
