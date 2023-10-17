@@ -198,7 +198,7 @@ namespace Wholesome
             return humanToTransform;
         }
 
-        private class AvatarArmature: IDisposable
+        private class AvatarArmature : IDisposable
         {
             private GameObject avatarObject;
 
@@ -295,6 +295,50 @@ namespace Wholesome
                     }
                 }
             }
+        }
+
+        private bool HasExistingSockets(GameObject avatarObject)
+        {
+            string[] names =
+            {
+                BlowjobName, $"{HandjobName} Right", $"{HandjobName} Left", $"Double {HandjobName}", PussyName,
+                AnalName, TitjobName, AssjobName, ThighjobName, $"{SoleName} Left", $"{SoleName} Right",
+                FootjobName
+            };
+            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>();
+            var socketCount = sockets.Count(socket =>
+                names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS");
+            return socketCount > 0;
+        }
+
+        private Dictionary<string, VRCFuryHapticSocket> ReadExistingSockets(GameObject avatarObject)
+        {
+            string[] names =
+            {
+                BlowjobName, $"{HandjobName} Right", $"{HandjobName} Left", $"Double {HandjobName}", PussyName,
+                AnalName, TitjobName, AssjobName, ThighjobName, $"{SoleName} Left", $"{SoleName} Right",
+                FootjobName
+            };
+            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>();
+            var filteredSockets = sockets.Where(socket =>
+                    names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS")
+                .ToDictionary(socket => socket.gameObject.name);
+            foreach (var socket in filteredSockets.Values)
+            {
+                socket.transform.SetParent(null, false);
+            }
+
+            return filteredSockets;
+            /*var socketChildren = new Dictionary<string, List<GameObject>>();
+            return filteredSockets
+                .Select(socket =>
+            {
+                //var obj = Object.Instantiate(socket);
+                socket
+                obj.gameObject.name = socket.gameObject.name;
+                return obj;
+            })
+                .ToDictionary(socket => socket.gameObject.name);*/
         }
 
         private Vector3 GetAlignDelta(Transform transform)
@@ -414,7 +458,26 @@ namespace Wholesome
             var armatureTransform = armature.FindBone(HumanBodyBones.Hips).parent;
             Debug.Assert(armatureTransform.parent == avatarGameObject.transform,
                 "Armature is doesn't share parent with mesh");
-            Clear(avatarGameObject);
+            var existingSockets = new Dictionary<string, VRCFuryHapticSocket>();
+            var keep = false;
+            if (HasExistingSockets(avatarGameObject))
+            {
+                var result = EditorUtility.DisplayDialogComplex("Warning",
+                    "Found existing sockets. Do you want to keep or clear them?", "Keep", "Cancel", "Clear");
+                switch (result)
+                {
+                    case 0: // Keep
+                        keep = true;
+                        existingSockets = ReadExistingSockets(avatarGameObject);
+                        break;
+                    case 1: // Cancel
+                        return;
+                    case 2: // Clear
+                        keep = false;
+                        Clear(avatarGameObject);
+                        break;
+                }
+            }
             // TODO: Handle no visemes
 
             var armatureScale = armatureTransform.localScale;
@@ -438,36 +501,45 @@ namespace Wholesome
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
 
-            var icons = new List<SetIcon>();
             var createdSockets = new List<VRCFuryHapticSocket>();
             if (defaultOn)
             {
                 if (blowjobOn)
                 {
-                    var mouthPosition = new Vector3(0, 0.01f, 0.075f);
-                    if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                    if (keep && existingSockets.TryGetValue(BlowjobName, out var existingSocket))
                     {
-                        var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
-                        if (!string.IsNullOrEmpty(visemOhBlendshapeName))
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Head), false);
+                        if (existingSocket.depthActions.Count == 0)
                         {
-                            mouthPosition = armature.FindBone(HumanBodyBones.Head).InverseTransformPoint(
-                                DetectMouthPosition(
-                                    vrcAvatar.VisemeSkinnedMesh,
-                                    vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                        visemOhBlendshapeName), armature.FindBone(HumanBodyBones.Head)));
+                            AddBlendshape(existingSocket, blowjobBlendshape.ToString());
                         }
-                    }
 
-                    var socket = CreateSocket(BlowjobName, VRCFuryHapticSocket.AddLight.Hole, true);
-                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Head),
-                        mouthPosition,
-                        Vector3.zero);
-                    AddBlendshape(socket, blowjobBlendshape.ToString());
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                        createdSockets.Add(existingSocket);
+                    }
+                    else
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
+                        var mouthPosition = new Vector3(0, 0.01f, 0.075f);
+                        if (vrcAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                        {
+                            var visemOhBlendshapeName =
+                                vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
+                            if (!string.IsNullOrEmpty(visemOhBlendshapeName))
+                            {
+                                mouthPosition = armature.FindBone(HumanBodyBones.Head).InverseTransformPoint(
+                                    DetectMouthPosition(
+                                        vrcAvatar.VisemeSkinnedMesh,
+                                        vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                            visemOhBlendshapeName), armature.FindBone(HumanBodyBones.Head)));
+                            }
+                        }
+
+                        var socket = CreateSocket(BlowjobName, VRCFuryHapticSocket.AddLight.Hole, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Head),
+                            mouthPosition,
+                            Vector3.zero);
+                        AddBlendshape(socket, blowjobBlendshape.ToString());
+                        createdSockets.Add(socket);
+                    }
                 }
 
                 if (handjobOn)
@@ -476,102 +548,168 @@ namespace Wholesome
                     var rightAlignDelta = GetAlignDelta(armature.FindBone(HumanBodyBones.RightHand));
                     if (handjobLeftOn)
                     {
-                        var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true,
-                            "Handjob");
-                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.LeftHand),
-                            Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
-                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
-                        createdSockets.Add(socket);
-                        icons.Add(new SetIcon()
+                        if (keep && existingSockets.TryGetValue($"{HandjobName} Left", out var existingSocket))
                         {
-                            path = $"Sockets/{socket.name}"
-                        });
+                            existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.LeftHand), false);
+                            createdSockets.Add(existingSocket);
+                        }
+                        else
+                        {
+                            var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true,
+                                "Handjob");
+                            SetParentLocalPositionEulerAngles(socket.transform,
+                                armature.FindBone(HumanBodyBones.LeftHand),
+                                Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
+                                Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
+                            createdSockets.Add(socket);
+                        }
                     }
 
                     if (handjobRightOn)
                     {
-                        var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true,
-                            "Handjob");
-                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.RightHand),
-                            Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
-                            @base.Hand.EulerAngles + rightAlignDelta);
-                        createdSockets.Add(socket);
-                        icons.Add(new SetIcon()
+                        if (keep && existingSockets.TryGetValue($"{HandjobName} Right", out var existingSocket))
                         {
-                            path = $"Sockets/{socket.name}"
-                        });
+                            existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.RightHand), false);
+                            createdSockets.Add(existingSocket);
+                        }
+                        else
+                        {
+                            var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true,
+                                "Handjob");
+                            SetParentLocalPositionEulerAngles(socket.transform,
+                                armature.FindBone(HumanBodyBones.RightHand),
+                                Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
+                                @base.Hand.EulerAngles + rightAlignDelta);
+                            createdSockets.Add(socket);
+                        }
                     }
 
                     if (handjobBothOn)
                     {
-                        var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false,
-                            "Handjob");
-                        socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
-                        SetSymmetricParent2(socket.gameObject, armature.FindBone(HumanBodyBones.LeftHand),
-                            armature.FindBone(HumanBodyBones.RightHand),
-                            Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
-                            Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta,
-                            Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
-                            @base.Hand.EulerAngles + rightAlignDelta);
-                        createdSockets.Add(socket);
-                        icons.Add(new SetIcon()
+                        if (keep && existingSockets.TryGetValue($"Double {HandjobName}", out var existingSocket))
                         {
-                            path = $"Sockets/{socket.name}"
-                        });
+                            existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                            createdSockets.Add(existingSocket);
+                        }
+                        else
+                        {
+                            var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false,
+                                "Handjob");
+                            socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                            SetSymmetricParent2(socket.gameObject, armature.FindBone(HumanBodyBones.LeftHand),
+                                armature.FindBone(HumanBodyBones.RightHand),
+                                Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
+                                Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta,
+                                Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
+                                @base.Hand.EulerAngles + rightAlignDelta);
+                            createdSockets.Add(socket);
+                        }
                     }
                 }
 
                 if (pussyOn)
                 {
-                    var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, true);
-                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
-                        Vector3.Scale(@base.Pussy.Positon, inverseArmatureScale) * bakedScale,
-                        @base.Pussy.EulerAngles);
-                    AddBlendshape(socket, pussyBlendshape.ToString());
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(PussyName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
-                    if (sfxOn && sfxPussyOn)
-                    {
-                        var sfx = PrefabUtility.InstantiatePrefab(
-                            AssetDatabase.LoadAssetAtPath<GameObject>(
-                                "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
-                            socket.transform) as GameObject;
-                        socket.enableActiveAnimation = true;
-                        socket.activeActions = new State();
-                        socket.activeActions.actions.Add(new ObjectToggleAction
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        createdSockets.Add(existingSocket);
+                        if (sfxOn && sfxPussyOn)
                         {
-                            obj = sfx
-                        });
+                            // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
+                            var existingSFX = existingSocket.transform.Find("SFX");
+                            if (existingSFX == null)
+                            {
+                                var sfx = PrefabUtility.InstantiatePrefab(
+                                    AssetDatabase.LoadAssetAtPath<GameObject>(
+                                        "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                    existingSocket.transform) as GameObject;
+                                existingSocket.enableActiveAnimation = true;
+                                if (existingSocket.activeActions?.actions == null)
+                                {
+                                    existingSocket.activeActions = new State();
+                                }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, true);
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
+                            Vector3.Scale(@base.Pussy.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Pussy.EulerAngles);
+                        AddBlendshape(socket, pussyBlendshape.ToString());
+                        createdSockets.Add(socket);
+                        if (sfxOn && sfxPussyOn)
+                        {
+                            var sfx = PrefabUtility.InstantiatePrefab(
+                                AssetDatabase.LoadAssetAtPath<GameObject>(
+                                    "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                socket.transform) as GameObject;
+                            socket.enableActiveAnimation = true;
+                            socket.activeActions = new State();
+                            socket.activeActions.actions.Add(new ObjectToggleAction
+                            {
+                                obj = sfx
+                            });
+                        }
                     }
                 }
 
                 if (analOn)
                 {
-                    var socket = CreateSocket(AnalName, VRCFuryHapticSocket.AddLight.Hole, false);
-                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
-                        Vector3.Scale(@base.Anal.Positon, inverseArmatureScale) * bakedScale,
-                        @base.Anal.EulerAngles);
-                    AddBlendshape(socket, analBlendshape.ToString());
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(AnalName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
-                    if (sfxOn && sfxAnalOn)
-                    {
-                        var sfx = PrefabUtility.InstantiatePrefab(
-                            AssetDatabase.LoadAssetAtPath<GameObject>(
-                                "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
-                            socket.transform) as GameObject;
-                        socket.enableActiveAnimation = true;
-                        socket.activeActions = new State();
-                        socket.activeActions.actions.Add(new ObjectToggleAction
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        createdSockets.Add(existingSocket);
+                        if (sfxOn && sfxAnalOn)
                         {
-                            obj = sfx
-                        });
+                            // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
+                            var existingSFX = existingSocket.transform.Find("SFX");
+                            if (existingSFX == null)
+                            {
+                                var sfx = PrefabUtility.InstantiatePrefab(
+                                    AssetDatabase.LoadAssetAtPath<GameObject>(
+                                        "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                    existingSocket.transform) as GameObject;
+                                existingSocket.enableActiveAnimation = true;
+                                if (existingSocket.activeActions?.actions == null)
+                                {
+                                    existingSocket.activeActions = new State();
+                                }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx
+                                });
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var socket = CreateSocket(AnalName, VRCFuryHapticSocket.AddLight.Hole, false);
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
+                            Vector3.Scale(@base.Anal.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Anal.EulerAngles);
+                        AddBlendshape(socket, analBlendshape.ToString());
+                        createdSockets.Add(socket);
+                        if (sfxOn && sfxAnalOn)
+                        {
+                            var sfx = PrefabUtility.InstantiatePrefab(
+                                AssetDatabase.LoadAssetAtPath<GameObject>(
+                                    "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                socket.transform) as GameObject;
+                            socket.enableActiveAnimation = true;
+                            socket.activeActions = new State();
+                            socket.activeActions.actions.Add(new ObjectToggleAction
+                            {
+                                obj = sfx
+                            });
+                        }
                     }
                 }
             }
@@ -580,43 +718,55 @@ namespace Wholesome
             {
                 if (titjobOn)
                 {
-                    var socket = CreateSocket(TitjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Chest),
-                        Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
-                        @base.Titjob.EulerAngles);
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(TitjobName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Chest), false);
+                        createdSockets.Add(existingSocket);
+                    }
+                    else
+                    {
+                        var socket = CreateSocket(TitjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Chest),
+                            Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Titjob.EulerAngles);
+                        createdSockets.Add(socket);
+                    }
                 }
 
                 if (assjobOn)
                 {
-                    var socket = CreateSocket(AssjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
-                        Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
-                        @base.Assjob.EulerAngles);
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(AssjobName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        createdSockets.Add(existingSocket);
+                    }
+                    else
+                    {
+                        var socket = CreateSocket(AssjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
+                            Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
+                            @base.Assjob.EulerAngles);
+                        createdSockets.Add(socket);
+                    }
                 }
 
                 if (thighjobOn)
                 {
-                    var socket = CreateSocket(ThighjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
-                    SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftUpperLeg),
-                        armature.FindBone(HumanBodyBones.RightUpperLeg),
-                        Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
-                        @base.Thighjob.EulerAngles);
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(ThighjobName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        createdSockets.Add(existingSocket);
+                    }
+                    else
+                    {
+                        var socket = CreateSocket(ThighjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
+                        socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftUpperLeg),
+                            armature.FindBone(HumanBodyBones.RightUpperLeg),
+                            Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
+                            @base.Thighjob.EulerAngles);
+                        createdSockets.Add(socket);
+                    }
                 }
             }
 
@@ -639,28 +789,40 @@ namespace Wholesome
 
                     if (soleLeftOn)
                     {
-                        var socket = CreateSocket($"{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true, "Feet");
-                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.LeftFoot),
-                            Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
-                            soleRotation);
-                        createdSockets.Add(socket);
-                        icons.Add(new SetIcon()
+                        if (keep && existingSockets.TryGetValue($"{SoleName} Left", out var existingSocket))
                         {
-                            path = $"Sockets/{socket.name}"
-                        });
+                            existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.LeftFoot), false);
+                            createdSockets.Add(existingSocket);
+                        }
+                        else
+                        {
+                            var socket = CreateSocket($"{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true,
+                                "Feet");
+                            SetParentLocalPositionEulerAngles(socket.transform,
+                                armature.FindBone(HumanBodyBones.LeftFoot),
+                                Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
+                                soleRotation);
+                            createdSockets.Add(socket);
+                        }
                     }
 
                     if (soleRightOn)
                     {
-                        var socket = CreateSocket($"{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true, "Feet");
-                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.RightFoot),
-                            Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
-                            soleRotation);
-                        createdSockets.Add(socket);
-                        icons.Add(new SetIcon()
+                        if (keep && existingSockets.TryGetValue($"{SoleName} Right", out var existingSocket))
                         {
-                            path = $"Sockets/{socket.name}"
-                        });
+                            existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.RightFoot), false);
+                            createdSockets.Add(existingSocket);
+                        }
+                        else
+                        {
+                            var socket = CreateSocket($"{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true,
+                                "Feet");
+                            SetParentLocalPositionEulerAngles(socket.transform,
+                                armature.FindBone(HumanBodyBones.RightFoot),
+                                Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
+                                soleRotation);
+                            createdSockets.Add(socket);
+                        }
                     }
                 }
 
@@ -679,16 +841,20 @@ namespace Wholesome
                         footjobRotation = @base.FootjobHeeled.EulerAngles;
                     }
 
-                    var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false, "Feet");
-                    socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
-                    SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftFoot),
-                        armature.FindBone(HumanBodyBones.RightFoot),
-                        Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
-                    createdSockets.Add(socket);
-                    icons.Add(new SetIcon()
+                    if (keep && existingSockets.TryGetValue(FootjobName, out var existingSocket))
                     {
-                        path = $"Sockets/{socket.name}"
-                    });
+                        existingSocket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        createdSockets.Add(existingSocket);
+                    }
+                    else
+                    {
+                        var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false, "Feet");
+                        socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftFoot),
+                            armature.FindBone(HumanBodyBones.RightFoot),
+                            Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
+                        createdSockets.Add(socket);
+                    }
                 }
             }
 
@@ -765,6 +931,7 @@ namespace Wholesome
                     globalParam = "WH_SFX_On"
                 });
             }
+
             armature.Dispose();
         }
 
@@ -1116,6 +1283,7 @@ namespace Wholesome
                             initiatedPrefab.transform.SetPositionAndRotation(position,
                                 Quaternion.AngleAxis(-180, Vector3.left));
                         }
+
                         armature.Dispose();
                     }
                     catch (Exception e)
