@@ -8,6 +8,7 @@ using System.Text;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.Animations;
+using VF.Builder;
 using VF.Component;
 using VF.Inspector;
 using VF.Model;
@@ -195,6 +196,27 @@ namespace Wholesome
             }
 
             return humanToTransform;
+        }
+
+        private class AvatarArmature: IDisposable
+        {
+            private GameObject avatarObject;
+
+            public AvatarArmature(GameObject avatarObject)
+            {
+                this.avatarObject = avatarObject;
+                VRCFArmatureUtils.WarmupCache(this.avatarObject);
+            }
+
+            public Transform FindBone(HumanBodyBones findBone)
+            {
+                return VRCFArmatureUtils.FindBoneOnArmatureOrException(avatarObject, findBone).transform;
+            }
+
+            public void Dispose()
+            {
+                VRCFArmatureUtils.ClearCache();
+            }
         }
 
         private void DrawSymmetricToggle(string name, ref bool on, ref bool left, ref bool right)
@@ -385,34 +407,33 @@ namespace Wholesome
             VRCAvatarDescriptor vrcAvatar = SelectedAvatar;
 
             var avatarGameObject = vrcAvatar.gameObject;
-            var animator = avatarGameObject.GetComponent<Animator>();
-            Debug.Assert(animator != null, "No animator on the avatar");
-            var unityAvatar = animator.avatar;
-            Debug.Assert(unityAvatar != null, "No Unity Avatar on the avatar");
             var meshes = vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
                 .Where(mesh => mesh.transform.parent == avatarGameObject.transform)
                 .ToArray();
-            var humanToTransform = BuildSkeleton(meshes, unityAvatar.humanDescription.human);
-            var armature = humanToTransform["Hips"].parent; // TODO: Missing key issue
-            Debug.Assert(armature.parent == avatarGameObject.transform,
+            var armature = new AvatarArmature(avatarGameObject);
+            var armatureTransform = armature.FindBone(HumanBodyBones.Hips).parent;
+            Debug.Assert(armatureTransform.parent == avatarGameObject.transform,
                 "Armature is doesn't share parent with mesh");
             Clear(avatarGameObject);
             // TODO: Handle no visemes
 
-            var armatureScale = armature.localScale;
+            var armatureScale = armatureTransform.localScale;
             var inverseArmatureScale = new Vector3(1 / armatureScale.x, 1 / armatureScale.y,
                 1 / armatureScale.z);
             var avatarScale = vrcAvatar.transform.localScale;
             var inverseAvatarScale = new Vector3(1 / avatarScale.x, 1 / avatarScale.y,
                 1 / avatarScale.z);
-            var hipLength = Vector3.Scale(humanToTransform["Spine"].position - humanToTransform["Hips"].position,
+            var hipLength = Vector3.Scale(
+                armature.FindBone(HumanBodyBones.Spine)
+                    .position - armature.FindBone(HumanBodyBones.Hips).position,
                 inverseAvatarScale).magnitude;
 
             // var hipLength = Vector3.Scale(humanToTransform["Spine"].localPosition, armatureScale).magnitude;
             var bakedScale = hipLength / @base.DefaultHipLength;
             if (selectedBase == 0) // Generic
             {
-                var torsoLength = humanToTransform["Hips"].InverseTransformPoint(humanToTransform["Neck"].position)
+                var torsoLength = armature.FindBone(HumanBodyBones.Hips)
+                    .InverseTransformPoint(armature.FindBone(HumanBodyBones.Neck).position)
                     .magnitude;
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
@@ -429,15 +450,16 @@ namespace Wholesome
                         var visemOhBlendshapeName = vrcAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
                         if (!string.IsNullOrEmpty(visemOhBlendshapeName))
                         {
-                            mouthPosition = humanToTransform["Head"].InverseTransformPoint(DetectMouthPosition(
-                                vrcAvatar.VisemeSkinnedMesh,
-                                vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                    visemOhBlendshapeName), humanToTransform["Head"]));
+                            mouthPosition = armature.FindBone(HumanBodyBones.Head).InverseTransformPoint(
+                                DetectMouthPosition(
+                                    vrcAvatar.VisemeSkinnedMesh,
+                                    vrcAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
+                                        visemOhBlendshapeName), armature.FindBone(HumanBodyBones.Head)));
                         }
                     }
 
                     var socket = CreateSocket(BlowjobName, VRCFuryHapticSocket.AddLight.Hole, true);
-                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Head"],
+                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Head),
                         mouthPosition,
                         Vector3.zero);
                     AddBlendshape(socket, blowjobBlendshape.ToString());
@@ -450,13 +472,13 @@ namespace Wholesome
 
                 if (handjobOn)
                 {
-                    var leftAlignDelta = GetAlignDelta(humanToTransform["LeftHand"]);
-                    var rightAlignDelta = GetAlignDelta(humanToTransform["RightHand"]);
+                    var leftAlignDelta = GetAlignDelta(armature.FindBone(HumanBodyBones.LeftHand));
+                    var rightAlignDelta = GetAlignDelta(armature.FindBone(HumanBodyBones.RightHand));
                     if (handjobLeftOn)
                     {
                         var socket = CreateSocket($"{HandjobName} Left", VRCFuryHapticSocket.AddLight.Ring, true,
                             "Handjob");
-                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftHand"],
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.LeftHand),
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta);
                         createdSockets.Add(socket);
@@ -470,7 +492,7 @@ namespace Wholesome
                     {
                         var socket = CreateSocket($"{HandjobName} Right", VRCFuryHapticSocket.AddLight.Ring, true,
                             "Handjob");
-                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightHand"],
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.RightHand),
                             Vector3.Scale(@base.Hand.Positon, inverseArmatureScale) * bakedScale,
                             @base.Hand.EulerAngles + rightAlignDelta);
                         createdSockets.Add(socket);
@@ -484,9 +506,9 @@ namespace Wholesome
                     {
                         var socket = CreateSocket($"Double {HandjobName}", VRCFuryHapticSocket.AddLight.Ring, false,
                             "Handjob");
-                        socket.transform.SetParent(humanToTransform["Hips"], false);
-                        SetSymmetricParent2(socket.gameObject, humanToTransform["LeftHand"],
-                            humanToTransform["RightHand"],
+                        socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                        SetSymmetricParent2(socket.gameObject, armature.FindBone(HumanBodyBones.LeftHand),
+                            armature.FindBone(HumanBodyBones.RightHand),
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
                             Vector3.Scale(@base.Hand.EulerAngles, new Vector3(1, -1, 1)) + leftAlignDelta,
                             Vector3.Scale(@base.Hand.Positon, avatarScale) * bakedScale, // World Scale
@@ -502,7 +524,7 @@ namespace Wholesome
                 if (pussyOn)
                 {
                     var socket = CreateSocket(PussyName, VRCFuryHapticSocket.AddLight.Hole, true);
-                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
                         Vector3.Scale(@base.Pussy.Positon, inverseArmatureScale) * bakedScale,
                         @base.Pussy.EulerAngles);
                     AddBlendshape(socket, pussyBlendshape.ToString());
@@ -529,7 +551,7 @@ namespace Wholesome
                 if (analOn)
                 {
                     var socket = CreateSocket(AnalName, VRCFuryHapticSocket.AddLight.Hole, false);
-                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
                         Vector3.Scale(@base.Anal.Positon, inverseArmatureScale) * bakedScale,
                         @base.Anal.EulerAngles);
                     AddBlendshape(socket, analBlendshape.ToString());
@@ -559,7 +581,7 @@ namespace Wholesome
                 if (titjobOn)
                 {
                     var socket = CreateSocket(TitjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Chest"],
+                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Chest),
                         Vector3.Scale(@base.Titjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Titjob.EulerAngles);
                     createdSockets.Add(socket);
@@ -572,7 +594,7 @@ namespace Wholesome
                 if (assjobOn)
                 {
                     var socket = CreateSocket(AssjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["Hips"],
+                    SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.Hips),
                         Vector3.Scale(@base.Assjob.Positon, inverseArmatureScale) * bakedScale,
                         @base.Assjob.EulerAngles);
                     createdSockets.Add(socket);
@@ -585,9 +607,9 @@ namespace Wholesome
                 if (thighjobOn)
                 {
                     var socket = CreateSocket(ThighjobName, VRCFuryHapticSocket.AddLight.Ring, false, "Special");
-                    socket.transform.SetParent(humanToTransform["Hips"], false);
-                    SetSymmetricParent(socket.gameObject, humanToTransform["LeftUpperLeg"],
-                        humanToTransform["RightUpperLeg"],
+                    socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                    SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftUpperLeg),
+                        armature.FindBone(HumanBodyBones.RightUpperLeg),
                         Vector3.Scale(@base.Thighjob.Positon, avatarScale) * bakedScale, // World Scale
                         @base.Thighjob.EulerAngles);
                     createdSockets.Add(socket);
@@ -618,7 +640,7 @@ namespace Wholesome
                     if (soleLeftOn)
                     {
                         var socket = CreateSocket($"{SoleName} Left", VRCFuryHapticSocket.AddLight.Ring, true, "Feet");
-                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["LeftFoot"],
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.LeftFoot),
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
@@ -631,7 +653,7 @@ namespace Wholesome
                     if (soleRightOn)
                     {
                         var socket = CreateSocket($"{SoleName} Right", VRCFuryHapticSocket.AddLight.Ring, true, "Feet");
-                        SetParentLocalPositionEulerAngles(socket.transform, humanToTransform["RightFoot"],
+                        SetParentLocalPositionEulerAngles(socket.transform, armature.FindBone(HumanBodyBones.RightFoot),
                             Vector3.Scale(solePosition, inverseArmatureScale) * bakedScale,
                             soleRotation);
                         createdSockets.Add(socket);
@@ -658,8 +680,9 @@ namespace Wholesome
                     }
 
                     var socket = CreateSocket($"{FootjobName}", VRCFuryHapticSocket.AddLight.Ring, false, "Feet");
-                    socket.transform.SetParent(humanToTransform["Hips"], false);
-                    SetSymmetricParent(socket.gameObject, humanToTransform["LeftFoot"], humanToTransform["RightFoot"],
+                    socket.transform.SetParent(armature.FindBone(HumanBodyBones.Hips), false);
+                    SetSymmetricParent(socket.gameObject, armature.FindBone(HumanBodyBones.LeftFoot),
+                        armature.FindBone(HumanBodyBones.RightFoot),
                         Vector3.Scale(footjobPosition, avatarScale) * bakedScale, footjobRotation); // World Scale
                     createdSockets.Add(socket);
                     icons.Add(new SetIcon()
@@ -742,6 +765,7 @@ namespace Wholesome
                     globalParam = "WH_SFX_On"
                 });
             }
+            armature.Dispose();
         }
 
         public static void Clear2(GameObject avatarGameObject)
@@ -1072,26 +1096,27 @@ namespace Wholesome
                         var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
                             .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
                             .ToArray();
-                        var humanToTransform = BuildSkeleton(avatarMeshes, unityAvatar.humanDescription.human);
+                        var armature = new AvatarArmature(selectedAvatar.gameObject);
                         if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
                         {
                             var visemOhBlendshapeName =
                                 SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
                             var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
                                 SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                    visemOhBlendshapeName), humanToTransform["Head"]);
+                                    visemOhBlendshapeName), armature.FindBone(HumanBodyBones.Head));
                             var position = mouthPosition + new Vector3(0, 0, 0.3f);
                             initiatedPrefab.transform.SetPositionAndRotation(position,
                                 Quaternion.AngleAxis(-180, Vector3.left));
                         }
                         else
                         {
-                            var mouthPosition = humanToTransform["Head"].transform
+                            var mouthPosition = armature.FindBone(HumanBodyBones.Head)
                                 .TransformPoint(new Vector3(0, 0.01f, 0.075f));
                             var position = mouthPosition + new Vector3(0, 0, 0.3f);
                             initiatedPrefab.transform.SetPositionAndRotation(position,
                                 Quaternion.AngleAxis(-180, Vector3.left));
                         }
+                        armature.Dispose();
                     }
                     catch (Exception e)
                     {
