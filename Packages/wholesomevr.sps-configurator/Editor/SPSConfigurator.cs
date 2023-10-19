@@ -8,6 +8,7 @@ using System.Text;
 using UnityEngine;
 using UnityEditor;
 using UnityEngine.Animations;
+using UnityEngine.Assertions;
 using VF.Builder;
 using VF.Component;
 using VF.Inspector;
@@ -172,6 +173,37 @@ namespace Wholesome
             }
         }
 
+        public static (int, int) DetermineArmatureAlignment(AvatarArmature armature)
+        {
+            var hips = armature.FindBone(HumanBodyBones.Hips);
+            Debug.Log(Math.Abs(hips.localPosition.x) < 0.01);
+            var upperLegRight = armature.FindBone(HumanBodyBones.RightUpperLeg);
+            var upperLegLeft = armature.FindBone(HumanBodyBones.LeftUpperLeg);
+            int symmetricIndex = -1;
+            for (int i = 0; i < 3; i++)
+            {
+                var leftCoord = upperLegLeft.localPosition[i];
+                var rightCoord = upperLegRight.localPosition[i];
+                Debug.Assert(Math.Abs(Math.Abs(leftCoord) - Math.Abs(rightCoord)) < 0.001);
+                if (Math.Sign(leftCoord) != Math.Sign(rightCoord) && leftCoord != 0 && rightCoord != 0)
+                {
+                    symmetricIndex = i;
+                    break;
+                }
+            }
+            Debug.Assert(symmetricIndex != -1);
+            Debug.Log("Continued");
+            var spine = armature.FindBone(HumanBodyBones.Spine);
+            var spineCoords = new[] { spine.localPosition.x, spine.localPosition.y, spine.localPosition.z }.ToList();
+            var maxIndex = spineCoords.IndexOf(spineCoords.Max());
+            var primary = Vector3.zero;
+            primary[maxIndex] = 1f;
+            var secondary = Vector3.zero;
+            secondary[symmetricIndex] = 1 * Math.Sign(upperLegLeft.localPosition[symmetricIndex]);
+            var matrix = Quaternion.LookRotation()
+            return (maxIndex, symmetricIndex);
+        }
+
         // TODO: Use root bone?
         public static Dictionary<string, Transform> BuildSkeleton(SkinnedMeshRenderer[] meshes, HumanBone[] bones)
         {
@@ -198,7 +230,7 @@ namespace Wholesome
             return humanToTransform;
         }
 
-        private class AvatarArmature : IDisposable
+        public class AvatarArmature : IDisposable
         {
             private GameObject avatarObject;
 
