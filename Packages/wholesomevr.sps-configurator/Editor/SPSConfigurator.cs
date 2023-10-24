@@ -697,6 +697,41 @@ namespace Wholesome
                                 {
                                     obj = sfx
                                 });
+                                var fxState = new State();
+                                fxState.actions.Add(new FxFloatAction()
+                                {
+                                    name = "WH_SFX_Depth"
+                                });
+                                existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                {
+                                    state = fxState,
+                                    enableSelf = true,
+                                    startDistance = 0,
+                                    endDistance = -0.5f,
+                                    smoothingSeconds = 0,
+                                });
+                            }
+                            else
+                            {
+                                // Add WHX_SFX_Depth animation if it doesn't exist
+                                if (!existingSocket.depthActions.Any(action =>
+                                        action.state.actions.Any(action2 =>
+                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                                {
+                                    var fxState = new State();
+                                    fxState.actions.Add(new FxFloatAction()
+                                    {
+                                        name = "WH_SFX_Depth"
+                                    });
+                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                    {
+                                        state = fxState,
+                                        enableSelf = true,
+                                        startDistance = 0,
+                                        endDistance = -0.5f,
+                                        smoothingSeconds = 0,
+                                    });
+                                }
                             }
                         }
                     }
@@ -719,6 +754,19 @@ namespace Wholesome
                             socket.activeActions.actions.Add(new ObjectToggleAction
                             {
                                 obj = sfx
+                            });
+                            var fxState = new State();
+                            fxState.actions.Add(new FxFloatAction()
+                            {
+                                name = "WH_SFX_Depth"
+                            });
+                            socket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                            {
+                                state = fxState,
+                                enableSelf = true,
+                                startDistance = 0,
+                                endDistance = -0.5f,
+                                smoothingSeconds = 0,
                             });
                         }
                     }
@@ -750,6 +798,41 @@ namespace Wholesome
                                 {
                                     obj = sfx
                                 });
+                                var fxState = new State();
+                                fxState.actions.Add(new FxFloatAction()
+                                {
+                                    name = "WH_SFX_Depth"
+                                });
+                                existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                {
+                                    state = fxState,
+                                    enableSelf = true,
+                                    startDistance = 0,
+                                    endDistance = -0.5f,
+                                    smoothingSeconds = 0,
+                                });
+                            }
+                            else
+                            {
+                                // Add WHX_SFX_Depth animation if it doesn't exist
+                                if (!existingSocket.depthActions.Any(action =>
+                                        action.state.actions.Any(action2 =>
+                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                                {
+                                    var fxState = new State();
+                                    fxState.actions.Add(new FxFloatAction()
+                                    {
+                                        name = "WH_SFX_Depth"
+                                    });
+                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                    {
+                                        state = fxState,
+                                        enableSelf = true,
+                                        startDistance = 0,
+                                        endDistance = -0.5f,
+                                        smoothingSeconds = 0,
+                                    });
+                                }
                             }
                         }
                     }
@@ -772,6 +855,19 @@ namespace Wholesome
                             socket.activeActions.actions.Add(new ObjectToggleAction
                             {
                                 obj = sfx
+                            });
+                            var fxState = new State();
+                            fxState.actions.Add(new FxFloatAction()
+                            {
+                                name = "WH_SFX_Depth"
+                            });
+                            socket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                            {
+                                state = fxState,
+                                enableSelf = true,
+                                startDistance = 0,
+                                endDistance = -0.5f,
+                                smoothingSeconds = 0,
                             });
                         }
                     }
