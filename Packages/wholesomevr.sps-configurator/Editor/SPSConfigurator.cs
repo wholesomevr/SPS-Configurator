@@ -173,7 +173,17 @@ namespace Wholesome
             }
         }
 
-        public static (int, int) DetermineArmatureAlignment(AvatarArmature armature)
+        private static Vector3 FindPrimaryDirection(Vector3 target)
+        {
+            var spineCoords = new[] { target.x, target.y, target.z }.Select(Math.Abs).ToList();
+            var primaryIndex = spineCoords.IndexOf(spineCoords.Max());
+            var primarySign = Math.Sign(target[primaryIndex]);
+            var primary = Vector3.zero;
+            primary[primaryIndex] = 1f * primarySign;
+            return primary;
+        }
+
+        public static (Quaternion, Quaternion) DetermineArmatureAlignment(AvatarArmature armature)
         {
             var hips = armature.FindBone(HumanBodyBones.Hips);
             Debug.Log(Math.Abs(hips.localPosition.x) < 0.01);
@@ -185,24 +195,27 @@ namespace Wholesome
                 var leftCoord = upperLegLeft.localPosition[i];
                 var rightCoord = upperLegRight.localPosition[i];
                 Debug.Assert(Math.Abs(Math.Abs(leftCoord) - Math.Abs(rightCoord)) < 0.001);
-                if (Math.Sign(leftCoord) != Math.Sign(rightCoord) && leftCoord != 0 && rightCoord != 0)
-                {
-                    symmetricIndex = i;
-                    break;
-                }
             }
-            Debug.Assert(symmetricIndex != -1);
-            Debug.Log("Continued");
-            var spine = armature.FindBone(HumanBodyBones.Spine);
-            var spineCoords = new[] { spine.localPosition.x, spine.localPosition.y, spine.localPosition.z }.ToList();
-            var maxIndex = spineCoords.IndexOf(spineCoords.Max());
-            var primary = Vector3.zero;
-            primary[maxIndex] = 1f;
-            var secondary = Vector3.zero;
-            secondary[symmetricIndex] = 1 * Math.Sign(upperLegLeft.localPosition[symmetricIndex]);
-            var matrix = Quaternion.LookRotation()
-            return (maxIndex, symmetricIndex);
+            var primary = FindPrimaryDirection(armature.FindBone(HumanBodyBones.Spine).localPosition);
+            var primaryRotation = Quaternion.FromToRotation(hips.transform.up, hips.TransformDirection(primary));
+            var secondaryRotation =
+                Quaternion.FromToRotation(primaryRotation * hips.transform.right, armature.AvatarObject.transform.right);
+            var aligned = new GameObject("Aligned");
+            aligned.transform.SetParent(hips, false);
+            aligned.transform.localRotation = primaryRotation*secondaryRotation;
+            var secondaryLeftArmRotation =
+                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.LeftUpperArm).right, -armature.AvatarObject.transform.forward);
+            var aligned2 = new GameObject("Aligned");
+            aligned2.transform.SetParent(armature.FindBone(HumanBodyBones.LeftUpperArm), false);
+            aligned2.transform.localRotation = primaryRotation*secondaryLeftArmRotation;
+            var secondaryRightArmRotation =
+                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.RightUpperArm).right, armature.AvatarObject.transform.forward);
+            var aligned3 = new GameObject("Aligned");
+            aligned3.transform.SetParent(armature.FindBone(HumanBodyBones.RightUpperArm), false);
+            aligned3.transform.localRotation = primaryRotation;
+            return (primaryRotation, secondaryRotation);
         }
+        
 
         // TODO: Use root bone?
         public static Dictionary<string, Transform> BuildSkeleton(SkinnedMeshRenderer[] meshes, HumanBone[] bones)
@@ -232,17 +245,36 @@ namespace Wholesome
 
         public class AvatarArmature : IDisposable
         {
-            private GameObject avatarObject;
+            public readonly GameObject AvatarObject;
+
+
 
             public AvatarArmature(GameObject avatarObject)
             {
-                this.avatarObject = avatarObject;
-                VRCFArmatureUtils.WarmupCache(this.avatarObject);
+                this.AvatarObject = avatarObject;
+                VRCFArmatureUtils.WarmupCache(this.AvatarObject);
             }
 
             public Transform FindBone(HumanBodyBones findBone)
             {
-                return VRCFArmatureUtils.FindBoneOnArmatureOrException(avatarObject, findBone).transform;
+                return VRCFArmatureUtils.FindBoneOnArmatureOrException(AvatarObject, findBone).transform;
+            }
+
+            public Quaternion CalcAlignmentDelta(HumanBodyBones bone, Vector3 primaryTarget, Vector3 secondaryTarget)
+            {
+                var transform = FindBone(bone);
+                var targetCoords = new[] { primaryTarget.x, primaryTarget.y, primaryTarget.z }.Select(Math.Abs).ToList();
+                var primaryIndex = targetCoords.IndexOf(targetCoords.Max());
+                var primarySign = Math.Sign(primaryTarget[primaryIndex]);
+                var primary = Vector3.zero;
+                primary[primaryIndex] = 1f * primarySign;
+                var primaryRotation = Quaternion.FromToRotation(transform.up, transform.TransformDirection(primary));
+                var secondaryRotation =
+                    Quaternion.FromToRotation((transform.rotation * primaryRotation) * Vector3.right, secondaryTarget);
+                var aligned = new GameObject("Aligned");
+                aligned.transform.SetParent(transform, false);
+                aligned.transform.localRotation = primaryRotation*secondaryRotation;
+                return primaryRotation*secondaryRotation;
             }
 
             public void Dispose()
