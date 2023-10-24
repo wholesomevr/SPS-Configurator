@@ -84,7 +84,7 @@ namespace Wholesome
         {
             var window = GetWindow(typeof(SPSConfigurator));
             window.titleContent = new GUIContent("SPS Configurator");
-            window.minSize = new Vector2(490, 790);
+            window.minSize = new Vector2(490, 806);
             window.Show();
         }
 
