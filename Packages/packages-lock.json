@@ -160,6 +160,18 @@
         "com.unity.nuget.newtonsoft-json": "3.0.2"
       }
     },
+    "dev.hai-vr.animator-as-code.v1": {
+      "version": "file:dev.hai-vr.animator-as-code.v1",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
+    "dev.hai-vr.animator-as-code.v1.vrchat": {
+      "version": "file:dev.hai-vr.animator-as-code.v1.vrchat",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "lyuma.av3emulator": {
       "version": "file:lyuma.av3emulator",
       "depth": 0,
