@@ -78,6 +78,7 @@ namespace Wholesome
         private bool sfxOn = false;
         private bool sfxPussyOn = true;
         private bool sfxAnalOn = true;
+        private Vector2 scrollPosition = new Vector2();
 
         [MenuItem("Tools/Wholesome/SPS Configurator")]
         public static void Open()
@@ -1269,6 +1270,7 @@ namespace Wholesome
             GUILayout.Label(logo, new GUIStyle { fixedWidth = 340, fixedHeight = 89 });
             GUILayout.FlexibleSpace();
             EditorGUILayout.EndHorizontal();
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.Space();
             EditorGUILayout.BeginVertical();
@@ -1472,6 +1474,8 @@ namespace Wholesome
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space();
             EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndScrollView();
+
         }
 
         private void DrawLabels()
