@@ -63,4 +63,6 @@ Assets/PackageMakerWindowData.asset*
 .idea
 .vscode
 Assets/*
+!Assets/AAC.cs
+!Assets/AAC.cs.meta
 Thry
