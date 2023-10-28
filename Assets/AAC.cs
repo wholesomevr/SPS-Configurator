@@ -102,7 +102,11 @@ namespace Wholesome
             var inertia = inertiaLayer.FloatParameter("Inertia");
             var inertiaPositive = inertiaLayer.FloatParameter("InertiaPositive");
             var inertiaNegative = inertiaLayer.FloatParameter("InertiaNegative");
-            
+            /*var acceleration = inertiaLayer.FloatParameter("Acceleration");
+            var accelerationPositive = inertiaLayer.FloatParameter("AccelerationPositive");
+            var accelerationNegative = inertiaLayer.FloatParameter("AccelerationNegative");*/
+
+
             var maxInertia = inertiaLayer.FloatParameter("Max Inertia");
             var maxInertiaDelta = inertiaLayer.FloatParameter("Max Inertia Delta");
             
@@ -200,6 +204,12 @@ namespace Wholesome
                     editClip.AnimatesAnimator(maxInertia)
                         .WithOneFrame(1);
                 });
+            var maxInertia0 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(maxInertia)
+                        .WithOneFrame(0);
+                });
             var maxInertiaDelta1 = aac.NewClip()
                 .Animating(editClip =>
                 {
@@ -243,7 +253,7 @@ namespace Wholesome
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(rMinus1, frameTimeParameter), a)
                     .WithAnimation(lastProximity1, proximityParam)
                     .WithAnimation(lastTimeAnimation, timeParameter)
-                    //.WithAnimation(maxInertia1, maxInertia)
+                    .WithAnimation(maxInertia1, maxInertia)
                 );
             
             var inertia2Layer = sfx.NewLayer("Inertia2");
@@ -284,9 +294,16 @@ namespace Wholesome
                     .WithAnimation(maxInertiaDeltaMinus1, inertia)
                 );
             var maxInertiaSet = maxInertiaLayer.NewState("Max Inertia")
-                .DrivingCopies(inertia, maxInertia);
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(maxInertia1, inertia));
+            var maxInertiaReset = maxInertiaLayer.NewState("Reset Max Inertia")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(maxInertia0, one));
             maxInertiaIdle.TransitionsTo(maxInertiaSet).When(maxInertiaDelta.IsLessThan(0f));
-            maxInertiaSet.Exits().AfterAnimationIsAtLeastAtPercent(0.01f);
+            maxInertiaIdle.TransitionsTo(maxInertiaReset).When(inertia.IsLessThan(-0.001f));
+            maxInertiaSet.Exits().When(one.IsGreaterThan(0));
+            maxInertiaReset.Exits().When(one.IsGreaterThan(0));
+
             
             /*
             var sfxLayer = sfx.NewLayer("SFX");
@@ -464,7 +481,7 @@ namespace Wholesome
                             .Animating(editClip =>
                             {
                                 editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length + 0.1f, 1);
+                                    .WithFixedSeconds(audioSource.clip.length, 1);
                             }));
                     ins.Add(state);
                 }
@@ -486,7 +503,7 @@ namespace Wholesome
                             .Animating(editClip =>
                             {
                                 editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length  + 0.1f, 1);
+                                    .WithFixedSeconds(audioSource.clip.length, 1);
                             }));
                     outs.Add(state);
                 }
@@ -508,7 +525,7 @@ namespace Wholesome
                             .Animating(editClip =>
                             {
                                 editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length + 0.1f, 1);
+                                    .WithFixedSeconds(audioSource.clip.length, 1);
                             }));
                     claps.Add(state);
                 }
@@ -519,20 +536,25 @@ namespace Wholesome
             {
                 inIdle.TransitionsTo(ins[i])
                     .When(randomIn.IsEqualTo(i))
-                    .And(inertia.IsGreaterThan(0.07f));
+                    .And(inertia.IsGreaterThan(0.03f/*0.07f*/));
                 //ins[i].TransitionsTo(clapIdle)
-                ins[i].TransitionsTo(outIdle)
+                var next = claps.Count > 0 ? clapIdle : outIdle;
+                ins[i].TransitionsTo(next)
                     .AfterAnimationIsAtLeastAtPercent(1);
             }
-            
-            /*for (var i = 0; i < claps.Count; i++)
+
+            for (var i = 0; i < claps.Count; i++)
             {
                 clapIdle.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(inertia.IsLessThan(0.02f))
+                    .And(maxInertia.IsGreaterThan(0.06f));
+                clapIdle.TransitionsTo(outIdle)
                     .When(randomClap.IsEqualTo(i))
                     .And(inertia.IsLessThan(0.02f));
                 claps[i].TransitionsTo(outIdle)
                     .AfterAnimationIsAtLeastAtPercent(1);
-            }*/
+            }
             for (var i = 0; i < outs.Count; i++)
             {
                 outIdle.TransitionsTo(outs[i])
@@ -586,6 +608,7 @@ namespace Wholesome
         }
         
         [MenuItem("Wholesome/AAC VRCF")]
+        [UnityEditor.Callbacks.DidReloadScripts]
         private static void CreateVRCFAC()
         {
             var gameObject = PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
