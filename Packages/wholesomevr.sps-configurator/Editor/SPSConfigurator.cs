@@ -1116,7 +1116,7 @@ namespace Wholesome
                 {
                     vrcFury.config.features.Add(new Toggle()
                     {
-                        name = $"{spsMenuPath}/Options/Sound FX",
+                        name = "SPS/Options/Sound FX",
                         saved = true,
                         defaultOn = true,
                         useGlobalParam = true,
@@ -1282,9 +1282,9 @@ namespace Wholesome
                         feature is MoveMenuItem m && possiblePaths.Contains(m.fromPath));
                     vrcFury.config.features.RemoveAll(feature =>
                         feature is SetIcon i && possiblePaths.Contains(i.path));
-                    vrcFury.config.features.RemoveAll(feature =>
-                        feature is Toggle t && t.name == $"{spsPath}/Options/Sound FX");
                 }
+                vrcFury.config.features.RemoveAll(feature =>
+                    feature is Toggle t && t.globalParam == "WH_SFX_On");
 
                 vrcFury.config.features.RemoveAll(feature => feature is SpsOptions sps);
                 if (vrcFury.config.features.Count == 0)
