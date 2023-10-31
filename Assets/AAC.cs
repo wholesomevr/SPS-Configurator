@@ -703,6 +703,7 @@ namespace Wholesome
             var velocityLayer = controller.NewLayer("Velocity");
             var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
             var proximity = velocityLayer.FloatParameter("WH_SFX_Depth");
+            var on = velocityLayer.BoolParameter("WH_SFX_On");
             var lastProximity = velocityLayer.FloatParameter("LastProximity");
             var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
             var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
@@ -748,6 +749,9 @@ namespace Wholesome
             var inTransform = gameObject.transform.Find("Sound/In");
             var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
             inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            var inOff = sfxInLayer.NewState("Off");
+            inIdle.TransitionsTo(inOff).When(on.IsFalse());
+            inOff.TransitionsTo(inIdle).When(on.IsTrue());
             for (var i = 0; i < ins.Count; i++)
             {
                 inIdle.TransitionsTo(ins[i])
@@ -765,6 +769,9 @@ namespace Wholesome
             var outTransform = gameObject.transform.Find("Sound/Out");
             var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
             outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            var outOff = sfxOutLayer.NewState("Off");
+            outIdle.TransitionsTo(outOff).When(on.IsFalse());
+            outOff.TransitionsTo(outIdle).When(on.IsTrue());
             for (var i = 0; i < outs.Count; i++)
             {
                 outIdle.TransitionsTo(outs[i])
@@ -785,13 +792,16 @@ namespace Wholesome
             var clapTransform = gameObject.transform.Find("Sound/Clap");
             var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
             clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            var clapOff = sfxClapLayer.NewState("Off");
+            clapIdle.TransitionsTo(clapOff).When(on.IsFalse());
+            clapOff.TransitionsTo(clapIdle).When(on.IsTrue());
             clapIdle.TransitionsTo(clapWait)
-                .When(proximityVelocity.IsGreaterThan(2f));
+                .When(proximityVelocity.IsGreaterThan(2.5f));
             for (var i = 0; i < claps.Count; i++)
             {
                 clapWait.TransitionsTo(claps[i])
                     .When(randomClap.IsEqualTo(i))
-                    .And(proximityVelocity.IsLessThan(1.5f));
+                    .And(proximityVelocity.IsLessThan(2f));
                 claps[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(traveled.IsLessThan(-0.01f));
