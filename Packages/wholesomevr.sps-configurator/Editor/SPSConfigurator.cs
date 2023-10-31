@@ -197,26 +197,30 @@ namespace Wholesome
                 var rightCoord = upperLegRight.localPosition[i];
                 Debug.Assert(Math.Abs(Math.Abs(leftCoord) - Math.Abs(rightCoord)) < 0.001);
             }
+
             var primary = FindPrimaryDirection(armature.FindBone(HumanBodyBones.Spine).localPosition);
             var primaryRotation = Quaternion.FromToRotation(hips.transform.up, hips.TransformDirection(primary));
             var secondaryRotation =
-                Quaternion.FromToRotation(primaryRotation * hips.transform.right, armature.AvatarObject.transform.right);
+                Quaternion.FromToRotation(primaryRotation * hips.transform.right,
+                    armature.AvatarObject.transform.right);
             var aligned = new GameObject("Aligned");
             aligned.transform.SetParent(hips, false);
-            aligned.transform.localRotation = primaryRotation*secondaryRotation;
+            aligned.transform.localRotation = primaryRotation * secondaryRotation;
             var secondaryLeftArmRotation =
-                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.LeftUpperArm).right, -armature.AvatarObject.transform.forward);
+                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.LeftUpperArm).right,
+                    -armature.AvatarObject.transform.forward);
             var aligned2 = new GameObject("Aligned");
             aligned2.transform.SetParent(armature.FindBone(HumanBodyBones.LeftUpperArm), false);
-            aligned2.transform.localRotation = primaryRotation*secondaryLeftArmRotation;
+            aligned2.transform.localRotation = primaryRotation * secondaryLeftArmRotation;
             var secondaryRightArmRotation =
-                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.RightUpperArm).right, armature.AvatarObject.transform.forward);
+                Quaternion.FromToRotation(armature.FindBone(HumanBodyBones.RightUpperArm).right,
+                    armature.AvatarObject.transform.forward);
             var aligned3 = new GameObject("Aligned");
             aligned3.transform.SetParent(armature.FindBone(HumanBodyBones.RightUpperArm), false);
             aligned3.transform.localRotation = primaryRotation;
             return (primaryRotation, secondaryRotation);
         }
-        
+
 
         // TODO: Use root bone?
         public static Dictionary<string, Transform> BuildSkeleton(SkinnedMeshRenderer[] meshes, HumanBone[] bones)
@@ -249,7 +253,6 @@ namespace Wholesome
             public readonly GameObject AvatarObject;
 
 
-
             public AvatarArmature(GameObject avatarObject)
             {
                 this.AvatarObject = avatarObject;
@@ -264,7 +267,8 @@ namespace Wholesome
             public Quaternion CalcAlignmentDelta(HumanBodyBones bone, Vector3 primaryTarget, Vector3 secondaryTarget)
             {
                 var transform = FindBone(bone);
-                var targetCoords = new[] { primaryTarget.x, primaryTarget.y, primaryTarget.z }.Select(Math.Abs).ToList();
+                var targetCoords = new[] { primaryTarget.x, primaryTarget.y, primaryTarget.z }.Select(Math.Abs)
+                    .ToList();
                 var primaryIndex = targetCoords.IndexOf(targetCoords.Max());
                 var primarySign = Math.Sign(primaryTarget[primaryIndex]);
                 var primary = Vector3.zero;
@@ -274,8 +278,8 @@ namespace Wholesome
                     Quaternion.FromToRotation((transform.rotation * primaryRotation) * Vector3.right, secondaryTarget);
                 var aligned = new GameObject("Aligned");
                 aligned.transform.SetParent(transform, false);
-                aligned.transform.localRotation = primaryRotation*secondaryRotation;
-                return primaryRotation*secondaryRotation;
+                aligned.transform.localRotation = primaryRotation * secondaryRotation;
+                return primaryRotation * secondaryRotation;
             }
 
             public void Dispose()
@@ -404,6 +408,10 @@ namespace Wholesome
                 return obj;
             })
                 .ToDictionary(socket => socket.gameObject.name);*/
+        }
+
+        private void UpdateMenu()
+        {
         }
 
         private Vector3 GetAlignDelta(Transform transform)
@@ -1046,51 +1054,75 @@ namespace Wholesome
                 }
             }
 
-
-            var vrcFury = avatarGameObject.AddComponent<VRCFury>();
-            vrcFury.config.features.Add(new SpsOptions()
+            if (keep)
             {
-                //menuIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Packages/com.vrcfury.vrcfury/VrcfResources/sps_icon.png"),
-                menuPath = spsMenuPath
-            });
-            vrcFury.config.features.Add(new SetIcon()
-            {
-                path = $"{spsMenuPath}/Handjob"
-            });
-            vrcFury.config.features.Add(new SetIcon()
-            {
-                path = $"{spsMenuPath}/Special"
-            });
-            vrcFury.config.features.Add(new SetIcon()
-            {
-                path = $"{spsMenuPath}/Feet"
-            });
-            // Reorder
-            vrcFury.config.features.Add(new MoveMenuItem()
-            {
-                fromPath = $"{spsMenuPath}/Handjob",
-                toPath = $"{spsMenuPath}/Handjob"
-            });
-            vrcFury.config.features.Add(new MoveMenuItem()
-            {
-                fromPath = $"{spsMenuPath}/Special",
-                toPath = $"{spsMenuPath}/Special"
-            });
-            vrcFury.config.features.Add(new MoveMenuItem()
-            {
-                fromPath = $"{spsMenuPath}/Feet",
-                toPath = $"{spsMenuPath}/Feet"
-            });
-            if (sfxOn && (sfxPussyOn || sfxAnalOn))
-            {
-                vrcFury.config.features.Add(new Toggle()
+                if (sfxOn && (sfxPussyOn || sfxAnalOn))
                 {
-                    name = $"{spsMenuPath}/Options/Sound FX",
-                    saved = true,
-                    defaultOn = true,
-                    useGlobalParam = true,
-                    globalParam = "WH_SFX_On"
+                    var vrcFurys = avatarGameObject.GetComponents<VRCFury>();
+                    var hasSfxToggle = vrcFurys.Any(vrcFury =>
+                        vrcFury.config.features.Where(feature => feature is Toggle).Any(feature =>
+                            (feature as Toggle).globalParam == "WH_SFX_On"));
+                    if (!hasSfxToggle)
+                    {
+                        var vrcFury = vrcFurys.Length > 0 ? vrcFurys[0] : avatarGameObject.AddComponent<VRCFury>();
+                        vrcFury.config.features.Add(new Toggle()
+                        {
+                            name = "SPS/Options/Sound FX",
+                            saved = true,
+                            defaultOn = true,
+                            useGlobalParam = true,
+                            globalParam = "WH_SFX_On"
+                        });
+                    }
+                }
+            }
+            else
+            {
+                var vrcFury = avatarGameObject.AddComponent<VRCFury>();
+                vrcFury.config.features.Add(new SpsOptions()
+                {
+                    //menuIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Packages/com.vrcfury.vrcfury/VrcfResources/sps_icon.png"),
+                    menuPath = spsMenuPath
                 });
+                vrcFury.config.features.Add(new SetIcon()
+                {
+                    path = $"{spsMenuPath}/Handjob"
+                });
+                vrcFury.config.features.Add(new SetIcon()
+                {
+                    path = $"{spsMenuPath}/Special"
+                });
+                vrcFury.config.features.Add(new SetIcon()
+                {
+                    path = $"{spsMenuPath}/Feet"
+                });
+                // Reorder
+                vrcFury.config.features.Add(new MoveMenuItem()
+                {
+                    fromPath = $"{spsMenuPath}/Handjob",
+                    toPath = $"{spsMenuPath}/Handjob"
+                });
+                vrcFury.config.features.Add(new MoveMenuItem()
+                {
+                    fromPath = $"{spsMenuPath}/Special",
+                    toPath = $"{spsMenuPath}/Special"
+                });
+                vrcFury.config.features.Add(new MoveMenuItem()
+                {
+                    fromPath = $"{spsMenuPath}/Feet",
+                    toPath = $"{spsMenuPath}/Feet"
+                });
+                if (sfxOn && (sfxPussyOn || sfxAnalOn))
+                {
+                    vrcFury.config.features.Add(new Toggle()
+                    {
+                        name = $"{spsMenuPath}/Options/Sound FX",
+                        saved = true,
+                        defaultOn = true,
+                        useGlobalParam = true,
+                        globalParam = "WH_SFX_On"
+                    });
+                }
             }
 
             armature.Dispose();
@@ -1475,7 +1507,6 @@ namespace Wholesome
             EditorGUILayout.Space();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndScrollView();
-
         }
 
         private void DrawLabels()
