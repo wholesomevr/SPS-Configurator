@@ -4,6 +4,7 @@ using AnimatorAsCode.V1.VRC;
 using AnimatorAsCode.V1;
 using UnityEditor;
 using UnityEditor.Animations;
+using UnityEditor.SceneManagement;
 using VF;
 using VF.Model;
 using VF.Model.Feature;
@@ -29,11 +30,807 @@ namespace Wholesome
             }
             
         }
+    }
+
+    public class ControllerBuilder
+    {
+        public readonly AacFlBase Aac;
+        private Dictionary<string, AacFlClip> _oneClips = new Dictionary<string, AacFlClip>();
+        private Dictionary<string, AacFlClip> _minusOneClips = new Dictionary<string, AacFlClip>();
+        private Dictionary<string, AacFlClip> _zeroClips = new Dictionary<string, AacFlClip>();
+
+        private Dictionary<float, AacFlFloatParameter> _constants = new Dictionary<float, AacFlFloatParameter>();
+        private Dictionary<string, AacFlFloatParameter> _params1000 = new Dictionary<string, AacFlFloatParameter>();
+
+        private AacFlLayer _timeLayer;
+        private AacFlFloatParameter _time;
+        private AacFlFloatParameter _lastTime;
+        public readonly AacFlFloatParameter FrameTime;
+        private AacFlLayer _layer;
+        private DBTBuilder _dbt;
+
+        public ControllerBuilder(AacFlBase aac, AacFlController controller)
+        {
+            Aac = aac;
+            _timeLayer= controller.NewLayer("Time");
+            _time = _timeLayer.FloatParameter("Time");
+            _lastTime = _timeLayer.FloatParameter("LastTime");
+            FrameTime = _timeLayer.FloatParameter("FrameTime");
+            _timeLayer.NewState("Time")
+                .WithAnimation(aac.NewClip()
+                    .Animating(editClip =>
+                    {
+                        editClip.AnimatesAnimator(_time)
+                            .WithSecondsUnit(keyframes =>
+                            {
+                                keyframes
+                                    .Linear(0, 0)
+                                    .Linear(20_000, 20_000);
+                            });
+                    }));
+            _layer = controller.NewLayer();
+            _dbt = DBT();
+            _layer.NewState("Hold")
+                .WithAnimation(_dbt
+                    .Set(_lastTime, _time)
+                    .Subtract(FrameTime, _time, _lastTime)
+                    .BlendTree);
+        }
+
+        public DBTBuilder DBT()
+        {
+            return new DBTBuilder(this);
+        }
+
+        public AacFlClip ValueClipUncached(AacFlFloatParameter parameter, float value)
+        {
+            var clip = Aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(parameter)
+                        .WithOneFrame(value);
+                });
+            return clip;
+        }
         
+        public AacFlClip OneClip(AacFlFloatParameter parameter)
+        {
+            AacFlClip clip;
+            if (!_oneClips.TryGetValue(parameter.Name, out clip))
+            {
+                clip = Aac.NewClip()
+                    .Animating(editClip =>
+                    {
+                        editClip.AnimatesAnimator(parameter)
+                            .WithOneFrame(1);
+                    });
+                _oneClips.Add(parameter.Name, clip);
+            }
+            return clip;
+        }
+        
+        public AacFlClip MinusOneClip(AacFlFloatParameter parameter)
+        {
+            AacFlClip clip;
+            if (!_minusOneClips.TryGetValue(parameter.Name, out clip))
+            {
+                clip = Aac.NewClip()
+                    .Animating(editClip =>
+                    {
+                        editClip.AnimatesAnimator(parameter)
+                            .WithOneFrame(-1);
+                    });
+                _minusOneClips.Add(parameter.Name, clip);
+            }
+            return clip;
+        }
+        
+        public AacFlClip ZeroClip(AacFlFloatParameter parameter)
+        {
+            AacFlClip clip;
+            if (!_zeroClips.TryGetValue(parameter.Name, out clip))
+            {
+                clip = Aac.NewClip()
+                    .Animating(editClip =>
+                    {
+                        editClip.AnimatesAnimator(parameter)
+                            .WithOneFrame(0);
+                    });
+                _zeroClips.Add(parameter.Name, clip);
+            }
+            return clip;
+        }
+
+        public AacFlFloatParameter Constant(float value)
+        {
+            AacFlFloatParameter constant;
+            if (!_constants.TryGetValue(value, out constant))
+            {
+                constant = _layer.FloatParameter(value.ToString());
+                _layer.OverrideValue(constant, value);
+                _constants.Add(value, constant);
+            }
+
+            return constant;
+        }
+
+        public AacFlFloatParameter Parameter1000(AacFlFloatParameter parameter)
+        {
+            AacFlFloatParameter param1000;
+            if (!_params1000.TryGetValue(parameter.Name, out param1000))
+            {
+                param1000 = _layer.FloatParameter($"{parameter.Name}1000");
+                _params1000.Add(parameter.Name, param1000);
+            }
+
+            return param1000;
+        }
+
+        public void Hold(AacFlFloatParameter parameter)
+        {
+            _dbt.Hold(parameter);
+        }
+    }
+
+    public class DBTBuilder
+    {
+        private ControllerBuilder _controllerBuilder;
+        public readonly AacFlBlendTreeDirect BlendTree;
+
+        internal DBTBuilder(ControllerBuilder controllerBuilder)
+        {
+            _controllerBuilder = controllerBuilder;
+            BlendTree = _controllerBuilder.Aac.NewBlendTree().Direct();
+        }
+
+        public DBTBuilder Multiply(AacFlFloatParameter result, params AacFlFloatParameter[] parameters)
+        {
+            AacFlBlendTreeDirect multiply = null;
+            foreach (var param in parameters)
+            {
+                if (multiply == null)
+                {
+                    multiply = _controllerBuilder.Aac.NewBlendTree().Direct().WithAnimation(_controllerBuilder.OneClip(result), param);
+                }
+                else
+                {
+                    multiply = _controllerBuilder.Aac.NewBlendTree().Direct().WithAnimation(multiply, param);
+                }
+            }
+
+            BlendTree.WithAnimation(multiply, _controllerBuilder.Constant(1));
+            return this;
+        }
+        
+        public DBTBuilder Set(AacFlFloatParameter result, AacFlFloatParameter parameter)
+        {
+            return Multiply(result, parameter);
+        }
+        
+        public DBTBuilder Set0(AacFlFloatParameter result)
+        {
+            BlendTree.WithAnimation(_controllerBuilder.ZeroClip(result), _controllerBuilder.Constant(1));
+            return this;
+        }
+        
+        public DBTBuilder Add(AacFlFloatParameter result, params AacFlFloatParameter[] parameters)
+        {
+            foreach (var param in parameters)
+            {
+                BlendTree.WithAnimation(_controllerBuilder.OneClip(result), param);
+            }
+            return this;
+        }
+        
+        public DBTBuilder Add1D(AacFlFloatParameter result, AacFlFloatParameter parameter1, AacFlFloatParameter parameter2)
+        {
+            BlendTree.WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter1)
+                .WithAnimation(_controllerBuilder.ValueClipUncached(result, -1f), -1f)
+                .WithAnimation(_controllerBuilder.ValueClipUncached(result, 1f), 1f)
+                , _controllerBuilder.Constant(1));
+            BlendTree.WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter2)
+                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, -1f), -1f)
+                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, 1f), 1f)
+                , _controllerBuilder.Constant(1));
+            return this;
+        }
+        
+        public DBTBuilder Subtract(AacFlFloatParameter result, params AacFlFloatParameter[] parameters)
+        {
+            BlendTree.WithAnimation(_controllerBuilder.OneClip(result), parameters[0]);
+            for (int i = 1; i < parameters.Length; i++)
+            {
+                BlendTree.WithAnimation(_controllerBuilder.MinusOneClip(result), parameters[i]);
+            }
+            return this;
+        }
+
+        public DBTBuilder Divide(AacFlFloatParameter result, AacFlFloatParameter dividend, AacFlFloatParameter divisor)
+        {
+            Multiply(_controllerBuilder.Parameter1000(divisor), divisor, _controllerBuilder.Constant(1000));
+            var divisionTree = _controllerBuilder.Aac.NewBlendTree().Direct()
+                .WithAnimation(_controllerBuilder.Aac.DummyClipLasting(1f, AacFlUnit.Frames), _controllerBuilder.Parameter1000(divisor))
+                .WithAnimation(_controllerBuilder.OneClip(result), _controllerBuilder.Constant(1e-3f));
+            using (var so = new SerializedObject(divisionTree.BlendTree))
+            {
+                so.FindProperty("m_NormalizedBlendValues").boolValue = true;
+                so.ApplyModifiedProperties();
+            }
+
+            BlendTree.WithAnimation(_controllerBuilder.Aac.NewBlendTree().Direct()
+                .WithAnimation(divisionTree, _controllerBuilder.Constant(1e6f)), dividend);
+            return this;
+        }
+
+        public DBTBuilder DivideConstant(AacFlFloatParameter result, AacFlFloatParameter dividend, float constant)
+        {
+            var one = _controllerBuilder.Constant(1);
+            var constantMinus1 = _controllerBuilder.Constant(constant - 1);
+            var divisionTree = _controllerBuilder.Aac.NewBlendTree().Direct()
+                .WithAnimation(_controllerBuilder.Aac.DummyClipLasting(1f, AacFlUnit.Frames), constantMinus1)
+                .WithAnimation(_controllerBuilder.OneClip(result), one);
+            using (var so = new SerializedObject(divisionTree.BlendTree))
+            {
+                so.FindProperty("m_NormalizedBlendValues").boolValue = true;
+                so.ApplyModifiedProperties();
+            }
+
+            BlendTree.WithAnimation(divisionTree, dividend);
+            return this;
+        }
+
+        public DBTBuilder Clamp(AacFlFloatParameter result, AacFlFloatParameter parameter, float higherBound)
+        {
+            BlendTree
+                .WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter)
+                    .WithAnimation(_controllerBuilder.ZeroClip(result), 0)
+                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, higherBound), higherBound), _controllerBuilder.Constant(1));
+            return this;
+        }
+
+        public DBTBuilder SmoothSliding(AacFlFloatParameter result, AacFlFloatParameter parameter, AacFlLayer layer, int windowSize = 5)
+        {
+            var window = new List<AacFlFloatParameter>();
+            window.Add(parameter);
+            for (var i = 0; i < windowSize - 1; i++)
+            {
+                var param = layer.FloatParameter($"{parameter.Name}{i + 1}");
+                window.Add(param);
+            }
+
+            
+            for (var i = windowSize-2; i >= 0 ; i--)
+            {
+                Set(window[i+1], window[i]);
+            }
+
+            var sum = layer.FloatParameter($"{parameter.Name}Sum");
+            Add(sum, window.ToArray());
+            DivideConstant(result, sum, windowSize);
+            return this;
+        }
+        
+        public DBTBuilder SmoothExp(AacFlFloatParameter result, AacFlFloatParameter parameter, AacFlLayer layer,
+            float stepSize = 12)
+        {
+            var lastValue = layer.FloatParameter("LastValue");
+            var delta = layer.FloatParameter("Delta");
+            Multiply(delta, _controllerBuilder.Constant(stepSize), _controllerBuilder.FrameTime);
+            var deltaClamped = layer.FloatParameter("ClampedDelta");
+            Clamp(deltaClamped, delta, 0.9f);
+            var oneMinusDelta = layer.FloatParameter("1-Delta");
+            Subtract(oneMinusDelta, _controllerBuilder.Constant(1), deltaClamped);
+            Multiply(result, deltaClamped, parameter);
+            Multiply(result, oneMinusDelta, lastValue);
+            Set(lastValue, parameter);
+            return this;
+        }
+
+        public DBTBuilder Hold(AacFlFloatParameter parameter)
+        {
+            BlendTree.WithAnimation(_controllerBuilder.OneClip(parameter), parameter);
+            return this;
+        }
     }
 
     public static class AACTools
     {
+
+        [MenuItem("Wholesome/AAC Test")]
+        private static void CreateStartEnd()
+        {
+            var gameObject = Selection.activeGameObject;
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Assets/AAC_SFX_Test.controller");
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController();
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("Proximity");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    .SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Set(lastProximity, smoothedProximity)
+                    .Subtract(proximityDelta, smoothedProximity, lastProximity)
+                    .Divide(proximityVelocity, proximityDelta, cb.FrameTime)
+                    .BlendTree);
+            
+            var startLayer = controller.NewLayer("Start");
+            var start = startLayer.FloatParameter("Start");
+            var startPlusOffset = startLayer.FloatParameter("Start+Offset");
+            var startDiff = startLayer.FloatParameter("StartDiff");
+            var startPlusOffsetDiff = startLayer.FloatParameter("Start+OffsetDiff");
+            
+            var endLayer = controller.NewLayer("End");
+            var end = endLayer.FloatParameter("End");
+            var endMinusOffset = endLayer.FloatParameter("End-Offset");
+            var endDiff = endLayer.FloatParameter("EndDiff");
+            var endMinusOffsetDiff = endLayer.FloatParameter("End-OffsetDiff");
+
+            var startCheck = startLayer.NewState("Check")
+                .WithAnimation(cb.DBT()
+                    .Subtract(startDiff, proximity, start)
+                    .BlendTree
+                );
+            var startSet = startLayer.NewState("Set")
+                .WithAnimation(cb.DBT()
+                    .Set(start, proximity)
+                    .BlendTree);
+            startCheck.TransitionsTo(startSet)
+                .When(startDiff.IsLessThan(0));
+            startSet.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var endCheck = endLayer.NewState("Check")
+                .WithAnimation(cb.DBT()
+                    .Subtract(endDiff, end, proximity)
+                    .BlendTree
+                );
+            var endSet = endLayer.NewState("Set")
+                .WithAnimation(cb.DBT()
+                    .Set(end, proximity)
+                    .BlendTree);
+            endCheck.TransitionsTo(endSet).When(endDiff.IsLessThan(0));
+            endSet.Exits().When(cb.Constant(1).IsGreaterThan(0));
+
+            var diffLayer = controller.NewLayer("Diff");
+            var diff = diffLayer.NewState("Diff")
+                .WithAnimation(cb.DBT()
+                    .Add(startPlusOffset, start, cb.Constant(0.01f))
+                    .Subtract(endMinusOffset, end, cb.Constant(0.01f))
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(end)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set(start, cb.Constant(1))
+                    .BlendTree);
+            resetIdleStart.TransitionsTo(resetEnd).When(startPlusOffsetDiff.IsLessThan(0));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(endMinusOffsetDiff.IsLessThan(0));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var sfxInLayer = controller.NewLayer("SFX In");
+            var randomIn = sfxInLayer.IntParameter("Random In");
+            var inIdle = sfxInLayer.NewState("Idle");
+            var inTransform = gameObject.transform.Find("Sound/In");
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
+            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(startPlusOffsetDiff.IsLessThan(0));
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(endMinusOffsetDiff.IsLessThan(0));
+
+            }
+
+            var sfxOutLayer = controller.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(endMinusOffsetDiff.IsLessThan(0));
+                /*outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximity.IsLessThan(0.001f));*/
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(startPlusOffsetDiff.IsLessThan(0));
+            }
+
+            /*var sfxClapLayer = sfx.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapIn = sfxClapLayer.NewState("In");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapIdle.TransitionsTo(clapIn)
+                    .When(inertia.IsGreaterThan(0.03f));
+                clapIn.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(inertia.IsLessThan(0.02f))
+                    .And(maxInertia.IsGreaterThan(0.06f));
+                clapIn.Exits()
+                    .When(inertia.IsLessThan(0.02f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(inertia.IsLessThan(-0.03f));
+            }*/
+            
+            
+            var debugLayer = controller.NewLayer("Debug");
+            debugLayer.NewState("Debug")
+                .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, -1)), -10)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, 1)), 10)
+                );
+            /*.WithAnimation(aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
+                        .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
+                })).MotionTime(inertia);*/
+            
+            cb.Hold(start);
+            cb.Hold(end);
+            AssetDatabase.SaveAssets();
+            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
+        }
+        
+        [MenuItem("Wholesome/AAC Delta Test")]
+        private static void CreateDelta()
+        {
+            var gameObject = Selection.activeGameObject;
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Assets/AAC_SFX_Delta_Test.controller");
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController("SFX");
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("Proximity");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var traveled = velocityLayer.FloatParameter("Traveled");
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Subtract(proximityDelta, proximity, lastProximity)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
+                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
+                    .Add1D(traveled, traveled, proximityDelta)
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(0));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var sfxInLayer = controller.NewLayer("SFX In");
+            var randomIn = sfxInLayer.IntParameter("Random In");
+            var inIdle = sfxInLayer.NewState("Idle");
+            var inTransform = gameObject.transform.Find("Sound/In");
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
+            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(traveled.IsGreaterThan(0.01f));
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.01f));
+
+            }
+
+            var sfxOutLayer = controller.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(traveled.IsLessThan(-0.01f));
+                /*outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximity.IsLessThan(0.001f));*/
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsGreaterThan(0.01f));
+            }
+
+            var sfxClapLayer = controller.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapWait = sfxClapLayer.NewState("Wait");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            clapIdle.TransitionsTo(clapWait)
+                .When(proximityVelocity.IsGreaterThan(2f));
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapWait.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(proximityVelocity.IsLessThan(1f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.01f));
+            }
+            
+            
+            var debugLayer = controller.NewLayer("Debug");
+            debugLayer.NewState("Debug")
+                .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, -1)), -10)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, 1)), 10)
+                );
+            /*.WithAnimation(aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
+                        .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
+                })).MotionTime(inertia);*/
+            
+            AssetDatabase.SaveAssets();
+            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
+        }
+        
+        [MenuItem("Wholesome/AAC Delta Test VRCF")]
+        private static void CreateDeltaVRCF()
+        {
+            var gameObject = PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+            //Create(gameObject, true);
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Packages/wholesomevr.sps-configurator/Assets/SFX/AAC_SFX.controller");
+            var controller = CreateDeltaController(gameObject, assetContainer);
+            AssetDatabase.SaveAssets();
+            SaveControllerVRCF(controller.AnimatorController, gameObject);
+            PrefabUtility.SaveAsPrefabAsset(gameObject, "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+            PrefabUtility.UnloadPrefabContents(gameObject);
+            /*var debugLayer = controller.NewLayer("Debug");
+            debugLayer.NewState("Debug")
+                .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, -1)), -10)
+                    .WithAnimation(aac.NewClip()
+                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                            new Vector3(0.1f, 0.1f, 1)), 10)
+                );*/
+            /*.WithAnimation(aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
+                        .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
+                })).MotionTime(inertia);*/
+        }
+
+        private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer)
+        {
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController("SFX");
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("WH_SFX_Depth");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var traveled = velocityLayer.FloatParameter("Traveled");
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Subtract(proximityDelta, proximity, lastProximity)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
+                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
+                    .Add1D(traveled, traveled, proximityDelta)
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.001f));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.001f));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var sfxInLayer = controller.NewLayer("SFX In");
+            var randomIn = sfxInLayer.IntParameter("Random In");
+            var inIdle = sfxInLayer.NewState("Idle");
+            var inTransform = gameObject.transform.Find("Sound/In");
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
+            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(traveled.IsGreaterThan(0.01f));
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.01f));
+
+            }
+
+            var sfxOutLayer = controller.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(traveled.IsLessThan(-0.01f));
+                /*outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximity.IsLessThan(0.001f));*/
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsGreaterThan(0.01f));
+            }
+
+            var sfxClapLayer = controller.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapWait = sfxClapLayer.NewState("Wait");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            clapIdle.TransitionsTo(clapWait)
+                .When(proximityVelocity.IsGreaterThan(2f));
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapWait.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(proximityVelocity.IsLessThan(1.5f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.01f));
+            }
+            AssetDatabase.SaveAssets();
+            return controller;
+        }
+
+        private static void SaveControllerVRCF(AnimatorController controller, GameObject gameObject)
+        {
+            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller;
+            var ctr = (gameObject.GetComponent<VRCFury>().config.features.Find(feature => feature is FullController) as
+                FullController).controllers[0].controller;
+            ctr = controller;
+            ctr.id = VrcfObjectId.ObjectToId(controller);
+            ctr.objRef = controller;
+        }
+        
+        private static List<AacFlState> CreateAudioStates(AacFlBase aac, AacFlLayer layer, Transform parentTransform)
+        {
+            var states = new List<AacFlState>();
+            for (var i = 0; i < parentTransform.childCount; i++)
+            {
+                var audioSource = parentTransform.GetChild(i).GetComponent<AudioSource>();
+                if (audioSource.gameObject.activeSelf)
+                {
+                    var state = layer.NewState($"Sound {i}")
+                        .WithAnimation(aac.NewClip()
+                            .Animating(editClip =>
+                            {
+                                editClip.Animates(audioSource, "m_Enabled")
+                                    .WithFixedSeconds(audioSource.clip.length, 1);
+                            }));
+                    states.Add(state);
+                }
+            }
+            return states;
+        }
+
         public static void Create(GameObject gameObject, bool vrcf = false)
         {
             AnimatorController assetContainer = new AnimatorController();
@@ -68,7 +865,6 @@ namespace Wholesome
                 });
             timeLayer.NewState("Time")
                 .WithAnimation(timeAnimation);
-            //var keepLayer = sfx.NewLayer("Keep");
             var inertiaLayer = sfx.NewLayer("Inertia");
             var one = inertiaLayer.FloatParameter("One");
             inertiaLayer.OverrideValue(one, 1);
@@ -105,7 +901,15 @@ namespace Wholesome
             /*var acceleration = inertiaLayer.FloatParameter("Acceleration");
             var accelerationPositive = inertiaLayer.FloatParameter("AccelerationPositive");
             var accelerationNegative = inertiaLayer.FloatParameter("AccelerationNegative");*/
-
+            var distance = inertiaLayer.FloatParameter("Distance");
+            var start = inertiaLayer.FloatParameter("Start");
+            var end = inertiaLayer.FloatParameter("End");
+            var startDiff = inertiaLayer.FloatParameter("StartDiff");
+            var endDiff = inertiaLayer.FloatParameter("EndDiff");
+            var startPlusOffset = inertiaLayer.FloatParameter("Start+Offset");
+            var endMinusOffset = inertiaLayer.FloatParameter("End-Offset");
+            var offset = inertiaLayer.FloatParameter("Offset");
+            inertiaLayer.OverrideValue(offset, 0.01f);
 
             var maxInertia = inertiaLayer.FloatParameter("Max Inertia");
             var maxInertiaDelta = inertiaLayer.FloatParameter("Max Inertia Delta");
@@ -222,10 +1026,72 @@ namespace Wholesome
                     editClip.AnimatesAnimator(maxInertiaDelta)
                         .WithOneFrame(-1);
                 });
-            /*keepLayer.NewState("Blend Tree")
-                .WithAnimation(aac.NewBlendTree().Direct()
-                    .WithAnimation(inertiaPositive1, inertiaPositive)
-                    .WithAnimation(inertiaNegative1, inertiaNegative));*/
+            var start1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(start)
+                        .WithOneFrame(1);
+                });
+            var start0 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(start)
+                        .WithOneFrame(0);
+                });
+            var end1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(end)
+                        .WithOneFrame(1);
+                });
+            var end0 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(end)
+                        .WithOneFrame(0);
+                });
+            var startDiff1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(startDiff)
+                        .WithOneFrame(1);
+                });
+            var startDiffMinus1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(startDiff)
+                        .WithOneFrame(-1);
+                });
+            var endDiff1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(endDiff)
+                        .WithOneFrame(1);
+                });
+            var endDiffMinus1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(endDiff)
+                        .WithOneFrame(-1);
+                });
+            var startPlusOffset1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(startPlusOffset)
+                        .WithOneFrame(1);
+                });
+            var endMinusOffset1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(endMinusOffset)
+                        .WithOneFrame(1);
+                });
+            var endMinusOffsetMinus1 = aac.NewClip()
+                .Animating(editClip =>
+                {
+                    editClip.AnimatesAnimator(endMinusOffset)
+                        .WithOneFrame(-1);
+                });
             var divisionTree = aac.NewBlendTree().Direct()
                 .WithAnimation(aac.DummyClipLasting(1f, AacFlUnit.Frames), frameTime1000Param)
                 .WithAnimation(proximitySpeedAbs1, oneEMinus3);
@@ -254,6 +1120,10 @@ namespace Wholesome
                     .WithAnimation(lastProximity1, proximityParam)
                     .WithAnimation(lastTimeAnimation, timeParameter)
                     .WithAnimation(maxInertia1, maxInertia)
+                    .WithAnimation(start1, start)
+                    .WithAnimation(end1, end)
+                    .WithAnimation(startPlusOffset1, startPlusOffset)
+                    .WithAnimation(endMinusOffset1, endMinusOffset)
                 );
             
             var inertia2Layer = sfx.NewLayer("Inertia2");
@@ -262,10 +1132,6 @@ namespace Wholesome
                     .Direct()
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaPositive1, inertiaPositive), r)
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaNegative1, inertiaNegative), r)
-                    /*.WithAnimation(
-                        aac.NewBlendTree().Direct()
-                            .WithAnimation(
-                                aac.NewBlendTree().Direct().WithAnimation(inertiaNegative1, frameTimeParameter), proximityDeltaAbs), b)*/
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaNegative1, proximitySpeedAbs), b)
                     .WithAnimation(inertia1, inertiaPositive)
                     .WithAnimation(inertiaMinus1, inertiaNegative)
@@ -275,11 +1141,6 @@ namespace Wholesome
                     .Direct()
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaPositive1, inertiaPositive), r)
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaNegative1, inertiaNegative), r)
-                    /*.WithAnimation(
-                        aac.NewBlendTree().Direct()
-                            .WithAnimation(
-                                aac.NewBlendTree().Direct().WithAnimation(inertiaPositive1, frameTimeParameter),
-                                proximityDeltaAbs), b)*/
                     .WithAnimation(aac.NewBlendTree().Direct().WithAnimation(inertiaPositive1, proximitySpeedAbs), b)
                     .WithAnimation(inertia1, inertiaPositive)
                     .WithAnimation(inertiaMinus1, inertiaNegative)
@@ -305,239 +1166,113 @@ namespace Wholesome
             maxInertiaReset.Exits().When(one.IsGreaterThan(0));
 
             
-            /*
-            var sfxLayer = sfx.NewLayer("SFX");
-            var idle = sfxLayer.NewState("Idle");
-            var off = sfxLayer.NewState("Off");
-            off.TransitionsTo(idle).When(sfxOn.IsGreaterThan(0.1f));
-            idle.TransitionsTo(off).When(sfxOn.IsLessThan(0.9f));
-            var fastIn = sfxLayer.NewState("Fast In")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Fast In").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.032f, 1);
-                    }));
-            var fastClap = sfxLayer.NewState("Fast Clap")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Fast Clap").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.048f, 1);
-                    }));
-            var fastOut = sfxLayer.NewState("Fast Out")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Fast Out").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.204f, 1);
-                    }));
-            var slowIn = sfxLayer.NewState("Slow In")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Slow In").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.081f, 1);
-                    }));
-            var slowOut = sfxLayer.NewState("Slow Out")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Slow Out").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.262f, 1);
-                    }));
-            var ultraFast = sfxLayer.NewState("Ultra Fast")
-                .WithAnimation(aac.NewClip()
-                    .Animating(editClip =>
-                    {
-                        editClip.Animates(gameObject.transform.Find("Sound/Ultra Fast").GetComponent<AudioSource>(), "m_Enabled")
-                            .WithFixedSeconds(0.448f, 1);
-                    }));
-            idle.TransitionsTo(fastIn)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsGreaterThan(0.15f));
-                //.And(inertia.IsLessThan(0.23f));
-                //.When(proximitySpeedAbs.IsGreaterThan(0.2f))
-                //.And(proximityDelta.IsGreaterThan(0));
-            fastIn.TransitionsTo(fastClap)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsLessThan(0.03f));
-            fastClap.TransitionsTo(fastOut)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsLessThan(-0.03f));
-            fastOut.Exits()
-                .AfterAnimationIsAtLeastAtPercent(1f);
-            /*idle.TransitionsTo(slowIn)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsGreaterThan(0.08f))
-                .And(inertia.IsLessThan(0.15f));
-            slowIn.TransitionsTo(slowOut)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsLessThan(-0.01f));
-            slowOut.Exits()
-                .AfterAnimationIsAtLeastAtPercent(1f);
-            idle.TransitionsTo(ultraFast)
-                .AfterAnimationIsAtLeastAtPercent(1f)
-                .When(inertia.IsGreaterThan(0.23f));
-            ultraFast.Exits()
-                .AfterAnimationIsAtLeastAtPercent(1f);*/
-            // save max value?*/
+            var startProximityLayer = sfx.NewLayer("Start Proximity");
+            var startProximityIdle = startProximityLayer.NewState("Idle")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(startDiff1, proximityParam)
+                    .WithAnimation(startDiffMinus1, start)
+                );
+            var startProximitySet = startProximityLayer.NewState("Set Start Proximity")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(start1, proximityParam)
+                    .WithAnimation(startPlusOffset1, start)
+                    .WithAnimation(startPlusOffset1, offset)
+                );
+            var startProximityReset = startProximityLayer.NewState("Reset Start Proximity")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(start1, one)
+                );
+            startProximityIdle.TransitionsTo(startProximitySet)
+                .When(startDiff.IsLessThan(0));
+            startProximityIdle.TransitionsTo(startProximityReset)
+                .When(endDiff.IsLessThan(0));
+            startProximitySet.Exits().When(one.IsGreaterThan(0));
+            startProximityReset.Exits().When(one.IsGreaterThan(0));
+            
+            var endProximityLayer = sfx.NewLayer("End Proximity");
+            var endProximityIdle = endProximityLayer.NewState("Idle")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(endDiff1, end)
+                    .WithAnimation(endDiffMinus1, proximityParam)
+                );
+            var endProximitySet = endProximityLayer.NewState("Set End Proximity")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(end1, proximityParam)
+                    .WithAnimation(endMinusOffset1, end)
+                    .WithAnimation(endMinusOffsetMinus1, offset)
+                );
+            var endProximityReset = startProximityLayer.NewState("Reset End Proximity")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(end0, one)
+                );
+            endProximityIdle.TransitionsTo(endProximitySet)
+                .When(endDiff.IsLessThan(0));
+            startProximitySet.Exits().When(one.IsGreaterThan(0));
+            endProximitySet.Exits().When(one.IsGreaterThan(0));
 
-            /*var sfxInLayer = sfx.NewLayer("SFX In");
+            var sfxInLayer = sfx.NewLayer("SFX In");
             var randomIn = sfxInLayer.IntParameter("Random In");
             var inIdle = sfxInLayer.NewState("Idle");
-            var ins = new[]
-            {
-                sfxInLayer.NewState("In 0")
-                    .WithAnimation(aac.NewClip()
-                        .Animating(editClip =>
-                            {
-                                editClip.Animates(gameObject.transform.Find("Sound/Fast In").GetComponent<AudioSource>(), "m_Enabled")
-                                    .WithFixedSeconds(0.032f, 1);
-                            })),
-                sfxInLayer.NewState("In 1")
-                    .WithAnimation(aac.NewClip()
-                        .Animating(editClip =>
-                        {
-                            editClip.Animates(gameObject.transform.Find("Sound/Slow In").GetComponent<AudioSource>(), "m_Enabled")
-                                .WithFixedSeconds(0.081f, 1);
-                        })),
-            };
-            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Length - 1);
-            for (var i = 0; i < ins.Length; i++)
-            {
-                inIdle.TransitionsTo(ins[i])
-                    .When(randomIn.IsEqualTo(i))
-                    .And(inertia.IsGreaterThan(0.15f));
-                ins[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1);
-            }
-            
-            var sfxOutLayer = sfx.NewLayer("SFX Out");
-            var randomOut = sfxOutLayer.IntParameter("Random Out");
-            var outIdle = sfxOutLayer.NewState("Idle");
-            var outs = new[]
-            {
-                sfxOutLayer.NewState("Out 0")
-                    .WithAnimation(aac.NewClip()
-                        .Animating(editClip =>
-                        {
-                            editClip.Animates(gameObject.transform.Find("Sound/Fast Out").GetComponent<AudioSource>(), "m_Enabled")
-                                .WithFixedSeconds(0.048f, 1);
-                        })),
-                sfxOutLayer.NewState("Out 1")
-                    .WithAnimation(aac.NewClip()
-                        .Animating(editClip =>
-                        {
-                            editClip.Animates(gameObject.transform.Find("Sound/Slow Out").GetComponent<AudioSource>(), "m_Enabled")
-                                .WithFixedSeconds(0.262f, 1);
-                        }))
-            };
-            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Length - 1);
-            for (var i = 0; i < outs.Length; i++)
-            {
-                outIdle.TransitionsTo(outs[i])
-                    .When(randomOut.IsEqualTo(i))
-                    .And(inertia.IsLessThan(-0.03f));
-                outs[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1);
-            }
-            
-            var sfxClapLayer = sfx.NewLayer("SFX Clap");
-            var randomClap = sfxClapLayer.IntParameter("Random Clap");
-            var clapIdle = sfxClapLayer.NewState("Idle");
-            var claps = new[]
-            {
-                sfxClapLayer.NewState("Clap 0")
-                    .WithAnimation(aac.NewClip()
-                        .Animating(editClip =>
-                        {
-                            editClip.Animates(gameObject.transform.Find("Sound/Fast Clap").GetComponent<AudioSource>(), "m_Enabled")
-                                .WithFixedSeconds(0.048f, 1);
-                        }))
-            };
-            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Length - 1);
-            for (var i = 0; i < claps.Length; i++)
-            {
-                clapIdle.TransitionsTo(claps[i])
-                    .When(randomClap.IsEqualTo(i))
-                    .And(inertia.IsLessThan(-0.03f));
-                claps[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1);
-            }*/
-            
-            var sfxLayer = sfx.NewLayer("SFX");
-            var randomIn = sfxLayer.IntParameter("Random In");
-            var inIdle = sfxLayer.NewState("Idle In");
-            var ins = new List<AacFlState>();
             var inTransform = gameObject.transform.Find("Sound/In");
-            for (var i = 0; i < inTransform.childCount; i++)
-            {
-                var audioSource = inTransform.GetChild(i).GetComponent<AudioSource>();
-                if (audioSource.gameObject.activeSelf)
-                {
-                    var state = sfxLayer.NewState($"In {i}")
-                        .WithAnimation(aac.NewClip()
-                            .Animating(editClip =>
-                            {
-                                editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length, 1);
-                            }));
-                    ins.Add(state);
-                }
-            }
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
             inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
-            
-            
-            var randomOut = sfxLayer.IntParameter("Random Out");
-            var outIdle = sfxLayer.NewState("Idle Out");
-            var outs = new List<AacFlState>();
-            var outTransform = gameObject.transform.Find("Sound/Out");
-            for (var i = 0; i < outTransform.childCount; i++)
-            {
-                var audioSource = outTransform.GetChild(i).GetComponent<AudioSource>();
-                if (audioSource.gameObject.activeSelf)
-                {
-                    var state = sfxLayer.NewState($"Out {i}")
-                        .WithAnimation(aac.NewClip()
-                            .Animating(editClip =>
-                            {
-                                editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length, 1);
-                            }));
-                    outs.Add(state);
-                }
-            }
-            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
-            
-            
-            var randomClap = sfxLayer.IntParameter("Random Clap");
-            var clapIdle = sfxLayer.NewState("Idle Clap");
-            var claps = new List<AacFlState>();
-            var clapTransform = gameObject.transform.Find("Sound/Clap");
-            for (var i = 0; i < clapTransform.childCount; i++)
-            {
-                var audioSource = clapTransform.GetChild(i).GetComponent<AudioSource>();
-                if (audioSource.gameObject.activeSelf)
-                {
-                    var state = sfxLayer.NewState($"Clap {i}")
-                        .WithAnimation(aac.NewClip()
-                            .Animating(editClip =>
-                            {
-                                editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length, 1);
-                            }));
-                    claps.Add(state);
-                }
-            }
-            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
-            
             for (var i = 0; i < ins.Count; i++)
             {
                 inIdle.TransitionsTo(ins[i])
                     .When(randomIn.IsEqualTo(i))
                     .And(inertia.IsGreaterThan(0.03f/*0.07f*/));
-                //ins[i].TransitionsTo(clapIdle)
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(inertia.IsLessThan(-0.03f));
+
+            }
+
+            var sfxOutLayer = sfx.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(inertia.IsLessThan(-0.03f/*0.07f*/));
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(inertia.IsGreaterThan(0.03f));
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximityParam.IsLessThan(0.001f));
+            }
+
+            var sfxClapLayer = sfx.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapIn = sfxClapLayer.NewState("In");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapIdle.TransitionsTo(clapIn)
+                    .When(inertia.IsGreaterThan(0.03f));
+                clapIn.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(inertia.IsLessThan(0.02f))
+                    .And(maxInertia.IsGreaterThan(0.06f));
+                clapIn.Exits()
+                    .When(inertia.IsLessThan(0.02f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(inertia.IsLessThan(-0.03f));
+            }
+            
+            /*for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(inertia.IsGreaterThan(0.03f));
                 var next = claps.Count > 0 ? clapIdle : outIdle;
                 ins[i].TransitionsTo(next)
                     .AfterAnimationIsAtLeastAtPercent(1);
@@ -562,13 +1297,13 @@ namespace Wholesome
                     .And(inertia.IsLessThan(-0.03f));
                 outs[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1);
-            }
+            }*/
 
-            var off = sfxLayer.NewState("Off");
+            /*var off = sfxLayer.NewState("Off");
             off.TransitionsTo(inIdle)
                 .When(sfxOn.IsEqualTo(true));
             sfxLayer.AnyTransitionsTo(off)
-                .When(sfxOn.IsEqualTo(false));
+                .When(sfxOn.IsEqualTo(false));*/
             
             
             /*
@@ -608,7 +1343,6 @@ namespace Wholesome
         }
         
         [MenuItem("Wholesome/AAC VRCF")]
-        [UnityEditor.Callbacks.DidReloadScripts]
         private static void CreateVRCFAC()
         {
             var gameObject = PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
