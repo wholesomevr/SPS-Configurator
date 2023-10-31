@@ -738,9 +738,9 @@ namespace Wholesome
                     .Set0(traveled)
                     .BlendTree);
             
-            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.001f));
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.005f));
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
-            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.001f));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.005f));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
             
             var sfxInLayer = controller.NewLayer("SFX In");
@@ -756,10 +756,10 @@ namespace Wholesome
             {
                 inIdle.TransitionsTo(ins[i])
                     .When(randomIn.IsEqualTo(i))
-                    .And(traveled.IsGreaterThan(0.01f));
+                    .And(traveled.IsGreaterThan(0.03f));
                 ins[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.01f));
+                    .When(traveled.IsLessThan(-0.03f));
 
             }
 
@@ -776,13 +776,13 @@ namespace Wholesome
             {
                 outIdle.TransitionsTo(outs[i])
                     .When(randomOut.IsEqualTo(i))
-                    .And(traveled.IsLessThan(-0.01f));
+                    .And(traveled.IsLessThan(-0.03f));
                 /*outs[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(proximity.IsLessThan(0.001f));*/
                 outs[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsGreaterThan(0.01f));
+                    .When(traveled.IsGreaterThan(0.03f));
             }
 
             var sfxClapLayer = controller.NewLayer("SFX Clap");
@@ -804,7 +804,7 @@ namespace Wholesome
                     .And(proximityVelocity.IsLessThan(2f));
                 claps[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.01f));
+                    .When(traveled.IsLessThan(-0.03f));
             }
             AssetDatabase.SaveAssets();
             return controller;
