@@ -668,22 +668,7 @@ namespace Wholesome
             SaveControllerVRCF(controller.AnimatorController, gameObject);
             PrefabUtility.SaveAsPrefabAsset(gameObject, "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
             PrefabUtility.UnloadPrefabContents(gameObject);
-            /*var debugLayer = controller.NewLayer("Debug");
-            debugLayer.NewState("Debug")
-                .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
-                    .WithAnimation(aac.NewClip()
-                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
-                            new Vector3(0.1f, 0.1f, -1)), -10)
-                    .WithAnimation(aac.NewClip()
-                        .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
-                            new Vector3(0.1f, 0.1f, 1)), 10)
-                );*/
-            /*.WithAnimation(aac.NewClip()
-                .Animating(editClip =>
-                {
-                    editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
-                        .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
-                })).MotionTime(inertia);*/
+            
         }
 
         private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer)
@@ -709,6 +694,14 @@ namespace Wholesome
             var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
             var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
             var traveled = velocityLayer.FloatParameter("Traveled");
+            var velocityIdleState = velocityLayer.NewState("Idle")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityIdle2State = velocityLayer.NewState("Idle2")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
             var velocityState = velocityLayer.NewState("Velocity")
                 .WithAnimation(cb.DBT()
                     //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
@@ -719,6 +712,9 @@ namespace Wholesome
                     .Add1D(traveled, traveled, proximityDelta)
                     .Set(lastProximity, proximity)
                     .BlendTree);
+            velocityIdleState.TransitionsTo(velocityState).When(proximity.IsGreaterThan(0.001f));
+            velocityState.Exits().When(proximity.IsLessThan(0.001f));
+            cb.Hold(lastProximity);
 
             var resetLayer = controller.NewLayer("Resetter");
             var resetIdleStart = resetLayer.NewState("Idle Start");
@@ -738,9 +734,9 @@ namespace Wholesome
                     .Set0(traveled)
                     .BlendTree);
             
-            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.005f));
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
-            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.005f));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
             
             var sfxInLayer = controller.NewLayer("SFX In");
@@ -796,16 +792,51 @@ namespace Wholesome
             clapIdle.TransitionsTo(clapOff).When(on.IsFalse());
             clapOff.TransitionsTo(clapIdle).When(on.IsTrue());
             clapIdle.TransitionsTo(clapWait)
-                .When(proximityVelocity.IsGreaterThan(2.5f));
+                .When(proximityVelocity.IsGreaterThan(0.7f));
             for (var i = 0; i < claps.Count; i++)
             {
                 clapWait.TransitionsTo(claps[i])
                     .When(randomClap.IsEqualTo(i))
-                    .And(proximityVelocity.IsLessThan(2f));
+                    .And(proximityVelocity.IsLessThan(0.35f));
                 claps[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(traveled.IsLessThan(-0.03f));
             }
+
+            /*
+            var debugTransform = gameObject.transform.Find("Debug");
+            var debugLayer = controller.NewLayer("Debug");
+            debugLayer.NewState("Debug")
+                .WithAnimation(aac.NewBlendTree().Direct()
+                    .WithAnimation(aac.NewBlendTree().Simple1D(proximity)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
+                                new Vector3(1, 0, 1)), 0)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
+                                new Vector3(1, 1, 1)), 1), cb.Constant(1))
+                    .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
+                                new Vector3(1, 0, 1)), 0)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
+                                new Vector3(1, 1, 1)), 2*0.7f), cb.Constant(1))
+                    .WithAnimation(aac.NewBlendTree().Simple1D(proximityDelta)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
+                                new Vector3(1, -1, 1)), -0.1f)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
+                                new Vector3(1, 1, 1)), 0.1f), cb.Constant(1))
+                    .WithAnimation(aac.NewBlendTree().Simple1D(traveled)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
+                                new Vector3(1, -1, 1)), -0.5f)
+                        .WithAnimation(aac.NewClip()
+                            .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
+                                new Vector3(1, 1, 1)), 0.5f), cb.Constant(1)));*/
+
             AssetDatabase.SaveAssets();
             return controller;
         }
@@ -814,10 +845,10 @@ namespace Wholesome
         {
             gameObject.GetComponent<Animator>().runtimeAnimatorController = controller;
             var ctr = (gameObject.GetComponent<VRCFury>().config.features.Find(feature => feature is FullController) as
-                FullController).controllers[0].controller;
-            ctr = controller;
-            ctr.id = VrcfObjectId.ObjectToId(controller);
-            ctr.objRef = controller;
+                FullController).controllers[0];
+            ctr.controller = controller;
+            ctr.controller.id = VrcfObjectId.ObjectToId(controller);
+            ctr.controller.objRef = controller;
         }
         
         private static List<AacFlState> CreateAudioStates(AacFlBase aac, AacFlLayer layer, Transform parentTransform)
