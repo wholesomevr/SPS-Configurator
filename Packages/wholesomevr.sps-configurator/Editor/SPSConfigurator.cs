@@ -82,7 +82,7 @@ namespace Wholesome
         private string spsMenuPath = "SPS";
         private bool experimentalFoldout = false;
         private bool sfxOn = true;
-        private bool sfxBlowjobOn = true;
+        private bool sfxBlowjobOn = false;
         private bool sfxPussyOn = true;
         private bool sfxAnalOn = true;
         private Vector2 scrollPosition = new Vector2();
