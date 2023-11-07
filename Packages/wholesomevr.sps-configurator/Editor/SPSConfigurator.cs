@@ -1,24 +1,30 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine.Animations;
 using UnityEngine.Assertions;
+using UnityEditor.PackageManager;
+using VF;
 using VF.Builder;
 using VF.Component;
 using VF.Inspector;
 using VF.Model;
 using VF.Model.Feature;
 using VF.Model.StateAction;
+using VF.Utils;
 using VRC.SDK3.Avatars.Components;
 using VRC.SDKBase;
 using Action = VF.Model.StateAction.Action;
 using Object = UnityEngine.Object;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 using Quaternion = UnityEngine.Quaternion;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
@@ -75,7 +81,8 @@ namespace Wholesome
         private SkinnedMeshRenderer[] meshes;
         private string spsMenuPath = "SPS";
         private bool experimentalFoldout = false;
-        private bool sfxOn = false;
+        private bool sfxOn = true;
+        private bool sfxBlowjobOn = true;
         private bool sfxPussyOn = true;
         private bool sfxAnalOn = true;
         private Vector2 scrollPosition = new Vector2();
@@ -127,6 +134,80 @@ namespace Wholesome
             {
                 return weightedPos;
             }
+        }
+
+        private (Object, Object) CopyAssets()
+        {
+            var packageInfo =
+                PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+            var dest = $"Assets/!Wholesome/SPS Configurator/{packageInfo.version}/SFX";
+            var sfxSrcSuffix = "Packages/wholesomevr.sps-configurator/Assets/SFX/";
+            
+            string SrcToDst(string path)
+            {
+                var file = path.Substring(sfxSrcSuffix.Length);
+                var dst = $"{dest}/{file}";
+                return dst;
+            }
+
+            void ReplaceAssets(string file)
+            {
+                var dstPrefab = AssetDatabase.LoadMainAssetAtPath($"{dest}/{file}") as GameObject;
+                var audios = dstPrefab.GetComponentsInChildren<AudioSource>();
+                foreach (var audioSource in audios)
+                {
+                    var clipSrcPath = AssetDatabase.GetAssetPath(audioSource.clip);
+                    if (clipSrcPath.StartsWith(sfxSrcSuffix))
+                    {
+                        audioSource.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(SrcToDst(clipSrcPath));
+                    }
+                }
+                var vrcf = dstPrefab.GetComponent<VRCFury>();
+                var fullCtr = (vrcf.config.features.Find(ft => ft is FullController) as FullController).controllers[0];
+                var ctrSrc = fullCtr.controller.Get();
+                var ctrSrcPath = AssetDatabase.GetAssetPath(ctrSrc);
+                if (ctrSrcPath.StartsWith(sfxSrcSuffix))
+                {
+                    var ctrDstPath = SrcToDst(ctrSrcPath);
+                    var ctrDst = AssetDatabase.LoadAllAssetsAtPath(ctrDstPath).ToList()
+                        .Find(asset => asset is AnimatorController ctr && ctr.name == ctrSrc.name) as AnimatorController;
+                    fullCtr.controller = ctrDst;
+                    fullCtr.controller.id = VrcfObjectId.ObjectToId(ctrDst);
+                    fullCtr.controller.objRef = ctrDst;
+                    dstPrefab.GetComponent<Animator>().runtimeAnimatorController = ctrDst;
+                }
+                PrefabUtility.SavePrefabAsset(dstPrefab);
+            }
+            
+            var sfxPath = "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab";
+            var sfxBJPath = "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX BJ.prefab";
+            var sfxDependencies = AssetDatabase.GetDependencies(sfxPath)
+                .Where(path => path.StartsWith("Packages/wholesomevr.sps-configurator/Assets/SFX/")).ToList();
+            var sfxBJDependencies = AssetDatabase.GetDependencies(sfxBJPath)
+                .Where(path => path.StartsWith("Packages/wholesomevr.sps-configurator/Assets/SFX/")).ToList();
+            foreach (var srcDependency in sfxDependencies)
+            {
+                var dstDependency = SrcToDst(srcDependency);
+                if (!File.Exists(dstDependency))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(dstDependency));
+                    AssetDatabase.CopyAsset(srcDependency, dstDependency);
+                }
+            }
+            ReplaceAssets("SFX.prefab");
+            foreach (var srcDependency in sfxBJDependencies)
+            {
+                var dstDependency = SrcToDst(srcDependency);
+                if (!File.Exists(dstDependency))
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(dstDependency));
+                    AssetDatabase.CopyAsset(srcDependency, dstDependency);
+                }
+            }
+            ReplaceAssets("SFX BJ.prefab");
+
+            return (AssetDatabase.LoadAssetAtPath<Object>($"{dest}/SFX.prefab"),
+                AssetDatabase.LoadAssetAtPath<Object>($"{dest}/SFX BJ.prefab"));
         }
 
 
@@ -574,6 +655,7 @@ namespace Wholesome
                 bakedScale = torsoLength / @base.DefaultTorsoLength;
             }
 
+            var (sfxPrefab, sfxBJPrefab) = CopyAssets();
             var createdSockets = new List<VRCFuryHapticSocket>();
             if (defaultOn)
             {
@@ -588,6 +670,62 @@ namespace Wholesome
                         }
 
                         createdSockets.Add(existingSocket);
+                        if (sfxOn && sfxBlowjobOn)
+                        {
+                            // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
+                            var existingSFX = existingSocket.transform.Find("SFX BJ");
+                            if (existingSFX == null)
+                            {
+                                var sfx =
+                                    PrefabUtility.InstantiatePrefab(sfxBJPrefab,
+                                        existingSocket.transform) as GameObject;
+                                existingSocket.enableActiveAnimation = true;
+                                if (existingSocket.activeActions?.actions == null)
+                                {
+                                    existingSocket.activeActions = new State();
+                                }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx
+                                });
+                                var fxState = new State();
+                                fxState.actions.Add(new FxFloatAction()
+                                {
+                                    name = "WH_SFX_Depth_Blowjob"
+                                });
+                                existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                {
+                                    state = fxState,
+                                    enableSelf = true,
+                                    startDistance = 0,
+                                    endDistance = -0.5f,
+                                    smoothingSeconds = 0,
+                                });
+                            }
+                            else
+                            {
+                                // Add WHX_SFX_Depth animation if it doesn't exist
+                                if (!existingSocket.depthActions.Any(action =>
+                                        action.state.actions.Any(action2 =>
+                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth_Blowjob")))
+                                {
+                                    var fxState = new State();
+                                    fxState.actions.Add(new FxFloatAction()
+                                    {
+                                        name = "WH_SFX_Depth_Blowjob"
+                                    });
+                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                                    {
+                                        state = fxState,
+                                        enableSelf = true,
+                                        startDistance = 0,
+                                        endDistance = -0.5f,
+                                        smoothingSeconds = 0,
+                                    });
+                                }
+                            }
+                        }
                     }
                     else
                     {
@@ -612,6 +750,30 @@ namespace Wholesome
                             Vector3.zero);
                         AddBlendshape(socket, blowjobBlendshape.ToString());
                         createdSockets.Add(socket);
+                        if (sfxOn && sfxBlowjobOn)
+                        {
+                            var sfx = PrefabUtility.InstantiatePrefab(sfxBJPrefab,
+                                socket.transform) as GameObject;
+                            socket.enableActiveAnimation = true;
+                            socket.activeActions = new State();
+                            socket.activeActions.actions.Add(new ObjectToggleAction
+                            {
+                                obj = sfx
+                            });
+                            var fxState = new State();
+                            fxState.actions.Add(new FxFloatAction()
+                            {
+                                name = "WH_SFX_Depth_Blowjob"
+                            });
+                            socket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+                            {
+                                state = fxState,
+                                enableSelf = true,
+                                startDistance = 0,
+                                endDistance = -0.5f,
+                                smoothingSeconds = 0,
+                            });
+                        }
                     }
                 }
 
@@ -692,9 +854,7 @@ namespace Wholesome
                             var existingSFX = existingSocket.transform.Find("SFX");
                             if (existingSFX == null)
                             {
-                                var sfx = PrefabUtility.InstantiatePrefab(
-                                    AssetDatabase.LoadAssetAtPath<GameObject>(
-                                        "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
                                     existingSocket.transform) as GameObject;
                                 existingSocket.enableActiveAnimation = true;
                                 if (existingSocket.activeActions?.actions == null)
@@ -754,9 +914,7 @@ namespace Wholesome
                         createdSockets.Add(socket);
                         if (sfxOn && sfxPussyOn)
                         {
-                            var sfx = PrefabUtility.InstantiatePrefab(
-                                AssetDatabase.LoadAssetAtPath<GameObject>(
-                                    "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                            var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
                                 socket.transform) as GameObject;
                             socket.enableActiveAnimation = true;
                             socket.activeActions = new State();
@@ -793,9 +951,7 @@ namespace Wholesome
                             var existingSFX = existingSocket.transform.Find("SFX");
                             if (existingSFX == null)
                             {
-                                var sfx = PrefabUtility.InstantiatePrefab(
-                                    AssetDatabase.LoadAssetAtPath<GameObject>(
-                                        "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                                var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
                                     existingSocket.transform) as GameObject;
                                 existingSocket.enableActiveAnimation = true;
                                 if (existingSocket.activeActions?.actions == null)
@@ -855,9 +1011,7 @@ namespace Wholesome
                         createdSockets.Add(socket);
                         if (sfxOn && sfxAnalOn)
                         {
-                            var sfx = PrefabUtility.InstantiatePrefab(
-                                AssetDatabase.LoadAssetAtPath<GameObject>(
-                                    "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab"),
+                            var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
                                 socket.transform) as GameObject;
                             socket.enableActiveAnimation = true;
                             socket.activeActions = new State();
@@ -1283,6 +1437,7 @@ namespace Wholesome
                     vrcFury.config.features.RemoveAll(feature =>
                         feature is SetIcon i && possiblePaths.Contains(i.path));
                 }
+
                 vrcFury.config.features.RemoveAll(feature =>
                     feature is Toggle t && t.globalParam == "WH_SFX_On");
 
@@ -1390,10 +1545,11 @@ namespace Wholesome
             EndCategory();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-            BeginCategory("Sound FX (Experimental)", ref sfxOn);
+            BeginCategory("Sound FX (Beta)", ref sfxOn);
             EditorGUILayout.BeginHorizontal();
-            sfxPussyOn = EditorGUILayout.ToggleLeft(PussyName, sfxPussyOn);
-            sfxAnalOn = EditorGUILayout.ToggleLeft(AnalName, sfxAnalOn);
+            //sfxBlowjobOn = EditorGUILayout.ToggleLeft(BlowjobName, sfxBlowjobOn, GUILayout.Width(94));
+            sfxPussyOn = EditorGUILayout.ToggleLeft(PussyName, sfxPussyOn, GUILayout.Width(94));
+            sfxAnalOn = EditorGUILayout.ToggleLeft(AnalName, sfxAnalOn, GUILayout.Width(94));
             EditorGUILayout.EndHorizontal();
             EndCategory();
             DrawParameterEstimation(selectedAvatar);
@@ -1572,11 +1728,16 @@ namespace Wholesome
 
         private const int GENERAL_SPS_COST = 1;
         private const int SINGLE_SPS_COST = 1;
+        private const int SFX_SPS_COST = 1;
 
         private void DrawParameterEstimation(VRCAvatarDescriptor avatar)
         {
             var avatarCost = avatar?.expressionParameters?.CalcTotalCost() ?? 0;
             var spsCost = GENERAL_SPS_COST;
+            if (sfxOn && (sfxPussyOn || sfxAnalOn))
+            {
+                spsCost += SFX_SPS_COST;
+            }
             if (defaultOn)
             {
                 if (blowjobOn)
