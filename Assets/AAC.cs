@@ -335,7 +335,329 @@ namespace Wholesome
 
     public static class AACTools
     {
+        
+        
+        [MenuItem("Wholesome/AAC Delta Test VRCF")]
+        private static void CreateDeltaVRCF()
+        {
+            var gameObject = AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab") as GameObject;
+            var gameObjectBJ = AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX BJ.prefab") as GameObject;
+            //Create(gameObject, true);
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Packages/wholesomevr.sps-configurator/Assets/SFX/AAC_SFX.controller");
+            
+            var controller = CreateDeltaController(gameObject, assetContainer);
+            var controllerBJ = CreateDeltaControllerBJ(gameObjectBJ, assetContainer);
+            AssetDatabase.SaveAssets();
+            SaveControllerVRCF(controller.AnimatorController, gameObject);
+            SaveControllerVRCF(controllerBJ.AnimatorController, gameObjectBJ);
+            PrefabUtility.SavePrefabAsset(gameObject);
+            PrefabUtility.SavePrefabAsset(gameObjectBJ);
+            //PrefabUtility.UnloadPrefabContents(gameObject);
+            //PrefabUtility.UnloadPrefabContents(gameObjectBJ);
+        }
 
+        private static AacFlController CreateDeltaControllerBJ(GameObject gameObject, Object assetContainer)
+        {
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController("SFX BJ");
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("WH_SFX_Depth_Blowjob"); // TODO
+            var on = velocityLayer.BoolParameter("WH_SFX_On");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var traveled = velocityLayer.FloatParameter("Traveled");
+            var velocityIdleState = velocityLayer.NewState("Idle")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityIdle2State = velocityLayer.NewState("Idle2")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Subtract(proximityDelta, proximity, lastProximity)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
+                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
+                    .Add1D(traveled, traveled, proximityDelta)
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            velocityIdleState.TransitionsTo(velocityState).When(proximity.IsGreaterThan(0.001f));
+            velocityState.Exits().When(proximity.IsLessThan(0.001f));
+            cb.Hold(lastProximity);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var sfxInLayer = controller.NewLayer("SFX In");
+            var randomIn = sfxInLayer.IntParameter("Random In");
+            var inIdle = sfxInLayer.NewState("Idle");
+            var inTransform = gameObject.transform.Find("Sound/In");
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
+            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            var inOff = sfxInLayer.NewState("Off");
+            inIdle.TransitionsTo(inOff).When(on.IsFalse());
+            inOff.TransitionsTo(inIdle).When(on.IsTrue());
+            for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(traveled.IsGreaterThan(0.03f));
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.03f));
+            }
+
+            var sfxOutLayer = controller.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            var outOff = sfxOutLayer.NewState("Off");
+            outIdle.TransitionsTo(outOff).When(on.IsFalse());
+            outOff.TransitionsTo(outIdle).When(on.IsTrue());
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(traveled.IsLessThan(-0.03f));
+                /*outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximity.IsLessThan(0.001f));*/
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsGreaterThan(0.03f));
+            }
+
+            var sfxClapLayer = controller.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapWait = sfxClapLayer.NewState("Wait");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            var clapOff = sfxClapLayer.NewState("Off");
+            clapIdle.TransitionsTo(clapOff).When(on.IsFalse());
+            clapOff.TransitionsTo(clapIdle).When(on.IsTrue());
+            clapIdle.TransitionsTo(clapWait)
+                .When(proximityVelocity.IsGreaterThan(0.7f));
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapWait.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(proximityVelocity.IsLessThan(0.35f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.03f));
+            }
+
+            AssetDatabase.SaveAssets();
+            return controller;
+        }
+        
+        private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer)
+        {
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController("SFX");
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("WH_SFX_Depth");
+            var on = velocityLayer.BoolParameter("WH_SFX_On");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var traveled = velocityLayer.FloatParameter("Traveled");
+            var velocityIdleState = velocityLayer.NewState("Idle")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityIdle2State = velocityLayer.NewState("Idle2")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Subtract(proximityDelta, proximity, lastProximity)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
+                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
+                    .Add1D(traveled, traveled, proximityDelta)
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            velocityIdleState.TransitionsTo(velocityState).When(proximity.IsGreaterThan(0.001f));
+            velocityState.Exits().When(proximity.IsLessThan(0.001f));
+            cb.Hold(lastProximity);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                    .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+                /*.WithAnimation(cb.DBT()
+                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                    .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+            
+            var sfxInLayer = controller.NewLayer("SFX In");
+            var randomIn = sfxInLayer.IntParameter("Random In");
+            var inIdle = sfxInLayer.NewState("Idle");
+            var inTransform = gameObject.transform.Find("Sound/In");
+            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
+            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
+            var inOff = sfxInLayer.NewState("Off");
+            inIdle.TransitionsTo(inOff).When(on.IsFalse());
+            inOff.TransitionsTo(inIdle).When(on.IsTrue());
+            for (var i = 0; i < ins.Count; i++)
+            {
+                inIdle.TransitionsTo(ins[i])
+                    .When(randomIn.IsEqualTo(i))
+                    .And(traveled.IsGreaterThan(0.03f));
+                ins[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.03f));
+
+            }
+
+            var sfxOutLayer = controller.NewLayer("SFX Out");
+            var randomOut = sfxOutLayer.IntParameter("Random Out");
+            var outIdle = sfxOutLayer.NewState("Idle");
+            var outTransform = gameObject.transform.Find("Sound/Out");
+            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
+            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
+            var outOff = sfxOutLayer.NewState("Off");
+            outIdle.TransitionsTo(outOff).When(on.IsFalse());
+            outOff.TransitionsTo(outIdle).When(on.IsTrue());
+            for (var i = 0; i < outs.Count; i++)
+            {
+                outIdle.TransitionsTo(outs[i])
+                    .When(randomOut.IsEqualTo(i))
+                    .And(traveled.IsLessThan(-0.03f));
+                /*outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(proximity.IsLessThan(0.001f));*/
+                outs[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsGreaterThan(0.03f));
+            }
+
+            var sfxClapLayer = controller.NewLayer("SFX Clap");
+            var randomClap = sfxClapLayer.IntParameter("Random Clap");
+            var clapIdle = sfxClapLayer.NewState("Idle");
+            var clapWait = sfxClapLayer.NewState("Wait");
+            var clapTransform = gameObject.transform.Find("Sound/Clap");
+            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
+            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
+            var clapOff = sfxClapLayer.NewState("Off");
+            clapIdle.TransitionsTo(clapOff).When(on.IsFalse());
+            clapOff.TransitionsTo(clapIdle).When(on.IsTrue());
+            clapIdle.TransitionsTo(clapWait)
+                .When(proximityVelocity.IsGreaterThan(0.7f));
+            for (var i = 0; i < claps.Count; i++)
+            {
+                clapWait.TransitionsTo(claps[i])
+                    .When(randomClap.IsEqualTo(i))
+                    .And(proximityVelocity.IsLessThan(0.35f));
+                claps[i].Exits()
+                    .AfterAnimationIsAtLeastAtPercent(1)
+                    .When(traveled.IsLessThan(-0.03f));
+            }
+            AssetDatabase.SaveAssets();
+            return controller;
+        }
+
+        private static void SaveControllerVRCF(AnimatorController controller, GameObject gameObject)
+        {
+            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller;
+            var ctr = (gameObject.GetComponent<VRCFury>().config.features.Find(feature => feature is FullController) as
+                FullController).controllers[0];
+            ctr.controller = controller;
+            ctr.controller.id = VrcfObjectId.ObjectToId(controller);
+            ctr.controller.objRef = controller;
+        }
+        
+        private static List<AacFlState> CreateAudioStates(AacFlBase aac, AacFlLayer layer, Transform parentTransform)
+        {
+            var states = new List<AacFlState>();
+            for (var i = 0; i < parentTransform.childCount; i++)
+            {
+                var audioSource = parentTransform.GetChild(i).GetComponent<AudioSource>();
+                if (audioSource.gameObject.activeSelf)
+                {
+                    var state = layer.NewState($"Sound {i}")
+                        .WithAnimation(aac.NewClip()
+                            .Animating(editClip =>
+                            {
+                                editClip.Animates(audioSource, "m_Enabled")
+                                    .WithFixedSeconds(audioSource.clip.length, 1);
+                            }));
+                    states.Add(state);
+                }
+            }
+            return states;
+        }
+        
         [MenuItem("Wholesome/AAC Test")]
         private static void CreateStartEnd()
         {
@@ -550,7 +872,7 @@ namespace Wholesome
                     //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
                     //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
                     .Subtract(proximityDelta, proximity, lastProximity)
-                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 10)
                     .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
                     .Add1D(traveled, traveled, proximityDelta)
                     .Set(lastProximity, proximity)
@@ -654,222 +976,6 @@ namespace Wholesome
             
             AssetDatabase.SaveAssets();
             gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
-        }
-        
-        [MenuItem("Wholesome/AAC Delta Test VRCF")]
-        private static void CreateDeltaVRCF()
-        {
-            var gameObject = PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
-            //Create(gameObject, true);
-            AnimatorController assetContainer = new AnimatorController();
-            AssetDatabase.CreateAsset(assetContainer, "Packages/wholesomevr.sps-configurator/Assets/SFX/AAC_SFX.controller");
-            var controller = CreateDeltaController(gameObject, assetContainer);
-            AssetDatabase.SaveAssets();
-            SaveControllerVRCF(controller.AnimatorController, gameObject);
-            PrefabUtility.SaveAsPrefabAsset(gameObject, "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
-            PrefabUtility.UnloadPrefabContents(gameObject);
-            
-        }
-
-        private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer)
-        {
-            var aac = AacV1.Create(new AacConfiguration
-            {
-                SystemName = "Wholesome",
-                AnimatorRoot = gameObject.transform,
-                DefaultValueRoot = gameObject.transform,
-                AssetContainer = assetContainer,
-                AssetKey = "WH",
-                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
-            });
-            var controller = aac.NewAnimatorController("SFX");
-            var cb = new ControllerBuilder(aac, controller);
-
-            var velocityLayer = controller.NewLayer("Velocity");
-            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
-            var proximity = velocityLayer.FloatParameter("WH_SFX_Depth");
-            var on = velocityLayer.BoolParameter("WH_SFX_On");
-            var lastProximity = velocityLayer.FloatParameter("LastProximity");
-            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
-            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
-            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
-            var traveled = velocityLayer.FloatParameter("Traveled");
-            var velocityIdleState = velocityLayer.NewState("Idle")
-                .WithAnimation(cb.DBT()
-                    .Set(lastProximity, proximity)
-                    .BlendTree);
-            var velocityIdle2State = velocityLayer.NewState("Idle2")
-                .WithAnimation(cb.DBT()
-                    .Set(lastProximity, proximity)
-                    .BlendTree);
-            var velocityState = velocityLayer.NewState("Velocity")
-                .WithAnimation(cb.DBT()
-                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
-                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
-                    .Subtract(proximityDelta, proximity, lastProximity)
-                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 5)
-                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
-                    .Add1D(traveled, traveled, proximityDelta)
-                    .Set(lastProximity, proximity)
-                    .BlendTree);
-            velocityIdleState.TransitionsTo(velocityState).When(proximity.IsGreaterThan(0.001f));
-            velocityState.Exits().When(proximity.IsLessThan(0.001f));
-            cb.Hold(lastProximity);
-
-            var resetLayer = controller.NewLayer("Resetter");
-            var resetIdleStart = resetLayer.NewState("Idle Start");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
-                    .BlendTree);*/
-            var resetEnd = resetLayer.NewState("Reset End")
-                .WithAnimation(cb.DBT()
-                    .Set0(traveled)
-                    .BlendTree);
-            var resetIdleEnd = resetLayer.NewState("Idle End");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
-                    .BlendTree);*/
-            var resetStart = resetLayer.NewState("Reset Start")
-                .WithAnimation(cb.DBT()
-                    .Set0(traveled)
-                    .BlendTree);
-            
-            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
-            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
-            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
-            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
-            var sfxInLayer = controller.NewLayer("SFX In");
-            var randomIn = sfxInLayer.IntParameter("Random In");
-            var inIdle = sfxInLayer.NewState("Idle");
-            var inTransform = gameObject.transform.Find("Sound/In");
-            var ins = CreateAudioStates(aac, sfxInLayer, inTransform);
-            inIdle.DrivingRandomizesUnsynced(randomIn, 0, ins.Count - 1);
-            var inOff = sfxInLayer.NewState("Off");
-            inIdle.TransitionsTo(inOff).When(on.IsFalse());
-            inOff.TransitionsTo(inIdle).When(on.IsTrue());
-            for (var i = 0; i < ins.Count; i++)
-            {
-                inIdle.TransitionsTo(ins[i])
-                    .When(randomIn.IsEqualTo(i))
-                    .And(traveled.IsGreaterThan(0.03f));
-                ins[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.03f));
-
-            }
-
-            var sfxOutLayer = controller.NewLayer("SFX Out");
-            var randomOut = sfxOutLayer.IntParameter("Random Out");
-            var outIdle = sfxOutLayer.NewState("Idle");
-            var outTransform = gameObject.transform.Find("Sound/Out");
-            var outs = CreateAudioStates(aac, sfxOutLayer, outTransform);
-            outIdle.DrivingRandomizesUnsynced(randomOut, 0, outs.Count - 1);
-            var outOff = sfxOutLayer.NewState("Off");
-            outIdle.TransitionsTo(outOff).When(on.IsFalse());
-            outOff.TransitionsTo(outIdle).When(on.IsTrue());
-            for (var i = 0; i < outs.Count; i++)
-            {
-                outIdle.TransitionsTo(outs[i])
-                    .When(randomOut.IsEqualTo(i))
-                    .And(traveled.IsLessThan(-0.03f));
-                /*outs[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(proximity.IsLessThan(0.001f));*/
-                outs[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsGreaterThan(0.03f));
-            }
-
-            var sfxClapLayer = controller.NewLayer("SFX Clap");
-            var randomClap = sfxClapLayer.IntParameter("Random Clap");
-            var clapIdle = sfxClapLayer.NewState("Idle");
-            var clapWait = sfxClapLayer.NewState("Wait");
-            var clapTransform = gameObject.transform.Find("Sound/Clap");
-            var claps = CreateAudioStates(aac, sfxClapLayer, clapTransform);
-            clapIdle.DrivingRandomizesUnsynced(randomClap, 0, claps.Count - 1);
-            var clapOff = sfxClapLayer.NewState("Off");
-            clapIdle.TransitionsTo(clapOff).When(on.IsFalse());
-            clapOff.TransitionsTo(clapIdle).When(on.IsTrue());
-            clapIdle.TransitionsTo(clapWait)
-                .When(proximityVelocity.IsGreaterThan(0.7f));
-            for (var i = 0; i < claps.Count; i++)
-            {
-                clapWait.TransitionsTo(claps[i])
-                    .When(randomClap.IsEqualTo(i))
-                    .And(proximityVelocity.IsLessThan(0.35f));
-                claps[i].Exits()
-                    .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.03f));
-            }
-
-            /*
-            var debugTransform = gameObject.transform.Find("Debug");
-            var debugLayer = controller.NewLayer("Debug");
-            debugLayer.NewState("Debug")
-                .WithAnimation(aac.NewBlendTree().Direct()
-                    .WithAnimation(aac.NewBlendTree().Simple1D(proximity)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
-                                new Vector3(1, 0, 1)), 0)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
-                                new Vector3(1, 1, 1)), 1), cb.Constant(1))
-                    .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
-                                new Vector3(1, 0, 1)), 0)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
-                                new Vector3(1, 1, 1)), 2*0.7f), cb.Constant(1))
-                    .WithAnimation(aac.NewBlendTree().Simple1D(proximityDelta)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
-                                new Vector3(1, -1, 1)), -0.1f)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
-                                new Vector3(1, 1, 1)), 0.1f), cb.Constant(1))
-                    .WithAnimation(aac.NewBlendTree().Simple1D(traveled)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
-                                new Vector3(1, -1, 1)), -0.5f)
-                        .WithAnimation(aac.NewClip()
-                            .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
-                                new Vector3(1, 1, 1)), 0.5f), cb.Constant(1)));*/
-
-            AssetDatabase.SaveAssets();
-            return controller;
-        }
-
-        private static void SaveControllerVRCF(AnimatorController controller, GameObject gameObject)
-        {
-            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller;
-            var ctr = (gameObject.GetComponent<VRCFury>().config.features.Find(feature => feature is FullController) as
-                FullController).controllers[0];
-            ctr.controller = controller;
-            ctr.controller.id = VrcfObjectId.ObjectToId(controller);
-            ctr.controller.objRef = controller;
-        }
-        
-        private static List<AacFlState> CreateAudioStates(AacFlBase aac, AacFlLayer layer, Transform parentTransform)
-        {
-            var states = new List<AacFlState>();
-            for (var i = 0; i < parentTransform.childCount; i++)
-            {
-                var audioSource = parentTransform.GetChild(i).GetComponent<AudioSource>();
-                if (audioSource.gameObject.activeSelf)
-                {
-                    var state = layer.NewState($"Sound {i}")
-                        .WithAnimation(aac.NewClip()
-                            .Animating(editClip =>
-                            {
-                                editClip.Animates(audioSource, "m_Enabled")
-                                    .WithFixedSeconds(audioSource.clip.length, 1);
-                            }));
-                    states.Add(state);
-                }
-            }
-            return states;
         }
 
         public static void Create(GameObject gameObject, bool vrcf = false)
