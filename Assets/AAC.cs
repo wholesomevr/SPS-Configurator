@@ -18,9 +18,8 @@ namespace Wholesome
     }
 
     [CustomEditor(typeof(AAC))]
-    public class AACEditor : Editor
+    public class AACEditor : UnityEditor.Editor
     {
-        
         public override void OnInspectorGUI()
         {
             if (GUILayout.Button("Build"))
@@ -28,7 +27,6 @@ namespace Wholesome
                 var obj = target as AAC;
                 AACTools.Create(obj.gameObject);
             }
-            
         }
     }
 
@@ -43,7 +41,7 @@ namespace Wholesome
         private Dictionary<string, AacFlFloatParameter> _params1000 = new Dictionary<string, AacFlFloatParameter>();
 
         private AacFlLayer _timeLayer;
-        private AacFlFloatParameter _time;
+        public readonly AacFlFloatParameter Time;
         private AacFlFloatParameter _lastTime;
         public readonly AacFlFloatParameter FrameTime;
         private AacFlLayer _layer;
@@ -52,15 +50,15 @@ namespace Wholesome
         public ControllerBuilder(AacFlBase aac, AacFlController controller)
         {
             Aac = aac;
-            _timeLayer= controller.NewLayer("Time");
-            _time = _timeLayer.FloatParameter("Time");
+            _timeLayer = controller.NewLayer("Time");
+            Time = _timeLayer.FloatParameter("Time");
             _lastTime = _timeLayer.FloatParameter("LastTime");
             FrameTime = _timeLayer.FloatParameter("FrameTime");
             _timeLayer.NewState("Time")
                 .WithAnimation(aac.NewClip()
                     .Animating(editClip =>
                     {
-                        editClip.AnimatesAnimator(_time)
+                        editClip.AnimatesAnimator(Time)
                             .WithSecondsUnit(keyframes =>
                             {
                                 keyframes
@@ -72,8 +70,8 @@ namespace Wholesome
             _dbt = DBT();
             _layer.NewState("Hold")
                 .WithAnimation(_dbt
-                    .Set(_lastTime, _time)
-                    .Subtract(FrameTime, _time, _lastTime)
+                    .Set(_lastTime, Time)
+                    .Subtract(FrameTime, Time, _lastTime)
                     .BlendTree);
         }
 
@@ -92,7 +90,7 @@ namespace Wholesome
                 });
             return clip;
         }
-        
+
         public AacFlClip OneClip(AacFlFloatParameter parameter)
         {
             AacFlClip clip;
@@ -106,9 +104,10 @@ namespace Wholesome
                     });
                 _oneClips.Add(parameter.Name, clip);
             }
+
             return clip;
         }
-        
+
         public AacFlClip MinusOneClip(AacFlFloatParameter parameter)
         {
             AacFlClip clip;
@@ -122,9 +121,10 @@ namespace Wholesome
                     });
                 _minusOneClips.Add(parameter.Name, clip);
             }
+
             return clip;
         }
-        
+
         public AacFlClip ZeroClip(AacFlFloatParameter parameter)
         {
             AacFlClip clip;
@@ -138,6 +138,7 @@ namespace Wholesome
                     });
                 _zeroClips.Add(parameter.Name, clip);
             }
+
             return clip;
         }
 
@@ -190,7 +191,8 @@ namespace Wholesome
             {
                 if (multiply == null)
                 {
-                    multiply = _controllerBuilder.Aac.NewBlendTree().Direct().WithAnimation(_controllerBuilder.OneClip(result), param);
+                    multiply = _controllerBuilder.Aac.NewBlendTree().Direct()
+                        .WithAnimation(_controllerBuilder.OneClip(result), param);
                 }
                 else
                 {
@@ -201,32 +203,34 @@ namespace Wholesome
             BlendTree.WithAnimation(multiply, _controllerBuilder.Constant(1));
             return this;
         }
-        
+
         public DBTBuilder Set(AacFlFloatParameter result, AacFlFloatParameter parameter)
         {
             return Multiply(result, parameter);
         }
-        
+
         public DBTBuilder Set0(AacFlFloatParameter result)
         {
             BlendTree.WithAnimation(_controllerBuilder.ZeroClip(result), _controllerBuilder.Constant(1));
             return this;
         }
-        
+
         public DBTBuilder Add(AacFlFloatParameter result, params AacFlFloatParameter[] parameters)
         {
             foreach (var param in parameters)
             {
                 BlendTree.WithAnimation(_controllerBuilder.OneClip(result), param);
             }
+
             return this;
         }
-        
-        public DBTBuilder Add1D(AacFlFloatParameter result, AacFlFloatParameter parameter1, AacFlFloatParameter parameter2)
+
+        public DBTBuilder Add1D(AacFlFloatParameter result, AacFlFloatParameter parameter1,
+            AacFlFloatParameter parameter2)
         {
             BlendTree.WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter1)
-                .WithAnimation(_controllerBuilder.ValueClipUncached(result, -1f), -1f)
-                .WithAnimation(_controllerBuilder.ValueClipUncached(result, 1f), 1f)
+                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, -1f), -1f)
+                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, 1f), 1f)
                 , _controllerBuilder.Constant(1));
             BlendTree.WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter2)
                     .WithAnimation(_controllerBuilder.ValueClipUncached(result, -1f), -1f)
@@ -234,7 +238,7 @@ namespace Wholesome
                 , _controllerBuilder.Constant(1));
             return this;
         }
-        
+
         public DBTBuilder Subtract(AacFlFloatParameter result, params AacFlFloatParameter[] parameters)
         {
             BlendTree.WithAnimation(_controllerBuilder.OneClip(result), parameters[0]);
@@ -242,6 +246,7 @@ namespace Wholesome
             {
                 BlendTree.WithAnimation(_controllerBuilder.MinusOneClip(result), parameters[i]);
             }
+
             return this;
         }
 
@@ -249,7 +254,8 @@ namespace Wholesome
         {
             Multiply(_controllerBuilder.Parameter1000(divisor), divisor, _controllerBuilder.Constant(1000));
             var divisionTree = _controllerBuilder.Aac.NewBlendTree().Direct()
-                .WithAnimation(_controllerBuilder.Aac.DummyClipLasting(1f, AacFlUnit.Frames), _controllerBuilder.Parameter1000(divisor))
+                .WithAnimation(_controllerBuilder.Aac.DummyClipLasting(1f, AacFlUnit.Frames),
+                    _controllerBuilder.Parameter1000(divisor))
                 .WithAnimation(_controllerBuilder.OneClip(result), _controllerBuilder.Constant(1e-3f));
             using (var so = new SerializedObject(divisionTree.BlendTree))
             {
@@ -283,12 +289,14 @@ namespace Wholesome
         {
             BlendTree
                 .WithAnimation(_controllerBuilder.Aac.NewBlendTree().Simple1D(parameter)
-                    .WithAnimation(_controllerBuilder.ZeroClip(result), 0)
-                    .WithAnimation(_controllerBuilder.ValueClipUncached(result, higherBound), higherBound), _controllerBuilder.Constant(1));
+                        .WithAnimation(_controllerBuilder.ZeroClip(result), 0)
+                        .WithAnimation(_controllerBuilder.ValueClipUncached(result, higherBound), higherBound),
+                    _controllerBuilder.Constant(1));
             return this;
         }
 
-        public DBTBuilder SmoothSliding(AacFlFloatParameter result, AacFlFloatParameter parameter, AacFlLayer layer, int windowSize = 5)
+        public DBTBuilder SmoothSliding(AacFlFloatParameter result, AacFlFloatParameter parameter, AacFlLayer layer,
+            int windowSize = 5)
         {
             var window = new List<AacFlFloatParameter>();
             window.Add(parameter);
@@ -298,10 +306,10 @@ namespace Wholesome
                 window.Add(param);
             }
 
-            
-            for (var i = windowSize-2; i >= 0 ; i--)
+
+            for (var i = windowSize - 2; i >= 0; i--)
             {
-                Set(window[i+1], window[i]);
+                Set(window[i + 1], window[i]);
             }
 
             var sum = layer.FloatParameter($"{parameter.Name}Sum");
@@ -309,7 +317,27 @@ namespace Wholesome
             DivideConstant(result, sum, windowSize);
             return this;
         }
-        
+
+        public DBTBuilder LastFrames(AacFlFloatParameter result, AacFlFloatParameter timestamp,
+            AacFlFloatParameter parameter, AacFlLayer layer, int frames = 4)
+        {
+            var frameList = new List<(AacFlFloatParameter, AacFlFloatParameter)>();
+            frameList.Add((parameter, _controllerBuilder.Time));
+            for (var i = 0; i < frames - 2; i++)
+            {
+                var param = layer.FloatParameter($"{parameter.Name}{i + 1}");
+                var time = layer.FloatParameter($"{parameter.Name}TimeStampe{i + 1}");
+                frameList.Add((param, time));
+            }
+            frameList.Add((result, timestamp));
+            for (var i = frameList.Count - 2; i >= 0; i--)
+            {
+                Set(frameList[i + 1].Item1, frameList[i].Item1);
+                Set(frameList[i + 1].Item2, frameList[i].Item2);
+            }
+            return this;
+        }
+
         public DBTBuilder SmoothExp(AacFlFloatParameter result, AacFlFloatParameter parameter, AacFlLayer layer,
             float stepSize = 12)
         {
@@ -335,17 +363,20 @@ namespace Wholesome
 
     public static class AACTools
     {
-        
-        
         [MenuItem("Wholesome/AAC Delta Test VRCF")]
         private static void CreateDeltaVRCF()
         {
-            var gameObject = AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab") as GameObject;
-            var gameObjectBJ = AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX BJ.prefab") as GameObject;
+            var gameObject =
+                AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab") as
+                    GameObject;
+            var gameObjectBJ =
+                AssetDatabase.LoadMainAssetAtPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX BJ.prefab") as
+                    GameObject;
             //Create(gameObject, true);
             AnimatorController assetContainer = new AnimatorController();
-            AssetDatabase.CreateAsset(assetContainer, "Packages/wholesomevr.sps-configurator/Assets/SFX/AAC_SFX.controller");
-            
+            AssetDatabase.CreateAsset(assetContainer,
+                "Packages/wholesomevr.sps-configurator/Assets/SFX/AAC_SFX.controller");
+
             var controller = CreateDeltaController(gameObject, assetContainer);
             var controllerBJ = CreateDeltaControllerBJ(gameObjectBJ, assetContainer);
             AssetDatabase.SaveAssets();
@@ -355,6 +386,27 @@ namespace Wholesome
             PrefabUtility.SavePrefabAsset(gameObjectBJ);
             //PrefabUtility.UnloadPrefabContents(gameObject);
             //PrefabUtility.UnloadPrefabContents(gameObjectBJ);
+        }
+
+        [MenuItem("Wholesome/AAC Delta Test Standalone")]
+        private static void CreateDeltaStandalone()
+        {
+            var gameObject = Selection.activeGameObject;
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Assets/AAC_SFX.controller");
+            var controller = CreateDeltaController(gameObject, assetContainer, true);
+            AssetDatabase.SaveAssets();
+        }
+        
+        [MenuItem("Wholesome/AAC Delta Test 2")]
+        private static void CreateDelta2()
+        {
+            var gameObject = Selection.activeGameObject;
+            AnimatorController assetContainer = new AnimatorController();
+            AssetDatabase.CreateAsset(assetContainer, "Assets/AAC_SFX.controller");
+            var controller = CreateDeltaController2(gameObject, assetContainer, true);
+            AssetDatabase.SaveAssets();
+            gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
         }
 
         private static AacFlController CreateDeltaControllerBJ(GameObject gameObject, Object assetContainer)
@@ -404,27 +456,27 @@ namespace Wholesome
 
             var resetLayer = controller.NewLayer("Resetter");
             var resetIdleStart = resetLayer.NewState("Idle Start");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                .BlendTree);*/
             var resetEnd = resetLayer.NewState("Reset End")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
             var resetIdleEnd = resetLayer.NewState("Idle End");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                .BlendTree);*/
             var resetStart = resetLayer.NewState("Reset Start")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
-            
+
             resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
             resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
+
             var sfxInLayer = controller.NewLayer("SFX In");
             var randomIn = sfxInLayer.IntParameter("Random In");
             var inIdle = sfxInLayer.NewState("Idle");
@@ -492,7 +544,117 @@ namespace Wholesome
             return controller;
         }
         
-        private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer)
+        private static AacFlController CreateDeltaController2(GameObject gameObject, Object assetContainer,
+            bool debug = false)
+        {
+            var aac = AacV1.Create(new AacConfiguration
+            {
+                SystemName = "Wholesome",
+                AnimatorRoot = gameObject.transform,
+                DefaultValueRoot = gameObject.transform,
+                AssetContainer = assetContainer,
+                AssetKey = "WH",
+                DefaultsProvider = new AacDefaultsProvider(writeDefaults: true)
+            });
+            var controller = aac.NewAnimatorController("SFX");
+            var cb = new ControllerBuilder(aac, controller);
+
+            var velocityLayer = controller.NewLayer("Velocity");
+            var smoothedProximity = velocityLayer.FloatParameter("SmoothedProximity");
+            var proximity = velocityLayer.FloatParameter("WH_SFX_Depth");
+            var on = velocityLayer.BoolParameter("WH_SFX_On");
+            var lastProximity = velocityLayer.FloatParameter("LastProximity");
+            var lastWinProximity = velocityLayer.FloatParameter("LastWinProximity");
+            var lastWinTime = velocityLayer.FloatParameter("LastWinTime");
+            var proximityWinDelta = velocityLayer.FloatParameter("ProximityWinDelta");
+            var proximityDelta = velocityLayer.FloatParameter("ProximityDelta");
+            var smoothedProximityDelta = velocityLayer.FloatParameter("SmoothedProximityDelta");
+            var timeDelta = velocityLayer.FloatParameter("TimeDelta");
+            var proximityWinVelocity = velocityLayer.FloatParameter("ProximityWinVelocity");
+            var proximityVelocity = velocityLayer.FloatParameter("ProximityVelocity");
+            var traveled = velocityLayer.FloatParameter("Traveled");
+            /*var velocityIdleState = velocityLayer.NewState("Idle")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);
+            var velocityIdle2State = velocityLayer.NewState("Idle2")
+                .WithAnimation(cb.DBT()
+                    .Set(lastProximity, proximity)
+                    .BlendTree);*/
+            var velocityState = velocityLayer.NewState("Velocity")
+                .WithAnimation(cb.DBT()
+                    //.SmoothSliding(smoothedProximity, proximity, velocityLayer, 10)
+                    //.SmoothExp(smoothedProximity, proximity, velocityLayer, 12)
+                    .Subtract(proximityDelta, proximity, lastProximity)
+                    .SmoothSliding(smoothedProximityDelta, proximityDelta, velocityLayer, 10)
+                    .Divide(proximityVelocity, smoothedProximityDelta, cb.FrameTime)
+                    .Add1D(traveled, traveled, proximityDelta)
+                    .Set(lastProximity, proximity)
+                    
+                    .Subtract(proximityWinDelta, proximity, lastWinProximity)
+                    .Subtract(timeDelta, cb.Time, lastWinTime)
+                    .Divide(proximityWinVelocity, proximityWinDelta, timeDelta)
+                    //.Add1D(traveled, traveled, proximityDelta)
+                    .LastFrames(lastWinProximity, lastWinTime, proximity, velocityLayer, 5)
+                    .BlendTree);
+            //velocityIdleState.TransitionsTo(velocityState).When(proximity.IsGreaterThan(0.001f));
+            //velocityState.Exits().When(proximity.IsLessThan(0.001f));
+            //cb.Hold(lastProximity);
+
+            var resetLayer = controller.NewLayer("Resetter");
+            var resetIdleStart = resetLayer.NewState("Idle Start");
+            /*.WithAnimation(cb.DBT()
+                .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                .BlendTree);*/
+            var resetEnd = resetLayer.NewState("Reset End")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+            var resetIdleEnd = resetLayer.NewState("Idle End");
+            /*.WithAnimation(cb.DBT()
+                .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                .BlendTree);*/
+            var resetStart = resetLayer.NewState("Reset Start")
+                .WithAnimation(cb.DBT()
+                    .Set0(traveled)
+                    .BlendTree);
+
+            resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
+            resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
+            resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
+            resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
+
+            if (debug)
+            {
+                var debugLayer = controller.NewLayer("Debug");
+                debugLayer.NewState("Debug")
+                    .WithAnimation(aac.NewBlendTree().Direct()
+                        .WithAnimation(aac.NewBlendTree()
+                            .Simple1D(proximityVelocity)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                                    new Vector3(0.1f, 0.1f, -1)), -10)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { gameObject.transform.Find("Sender/Container").gameObject },
+                                    new Vector3(0.1f, 0.1f, 1)), 10), cb.Constant(1))
+                        .WithAnimation(aac.NewBlendTree()
+                            .Simple1D(proximityWinVelocity)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { gameObject.transform.Find("Sender/Container (1)").gameObject },
+                                    new Vector3(0.1f, 0.1f, -1)), -10)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { gameObject.transform.Find("Sender/Container (1)").gameObject },
+                                    new Vector3(0.1f, 0.1f, 1)), 10), cb.Constant(1))
+                    
+                    );
+            }
+
+            AssetDatabase.SaveAssets();
+            return controller;
+        }
+
+        private static AacFlController CreateDeltaController(GameObject gameObject, Object assetContainer,
+            bool debug = false)
         {
             var aac = AacV1.Create(new AacConfiguration
             {
@@ -539,27 +701,27 @@ namespace Wholesome
 
             var resetLayer = controller.NewLayer("Resetter");
             var resetIdleStart = resetLayer.NewState("Idle Start");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                .BlendTree);*/
             var resetEnd = resetLayer.NewState("Reset End")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
             var resetIdleEnd = resetLayer.NewState("Idle End");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                .BlendTree);*/
             var resetStart = resetLayer.NewState("Reset Start")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
-            
+
             resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(-0.003f));
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
             resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0.003f));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
+
             var sfxInLayer = controller.NewLayer("SFX In");
             var randomIn = sfxInLayer.IntParameter("Random In");
             var inIdle = sfxInLayer.NewState("Idle");
@@ -576,8 +738,9 @@ namespace Wholesome
                     .And(traveled.IsGreaterThan(0.03f));
                 ins[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.03f));
-
+                    .When(traveled.IsLessThan(-0.03f))
+                    .Or()
+                    .When(proximity.IsLessThan(0.001f));
             }
 
             var sfxOutLayer = controller.NewLayer("SFX Out");
@@ -599,7 +762,9 @@ namespace Wholesome
                     .When(proximity.IsLessThan(0.001f));*/
                 outs[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsGreaterThan(0.03f));
+                    .When(traveled.IsGreaterThan(0.03f))
+                    .Or()
+                    .When(proximity.IsLessThan(0.001f));
             }
 
             var sfxClapLayer = controller.NewLayer("SFX Clap");
@@ -618,11 +783,50 @@ namespace Wholesome
             {
                 clapWait.TransitionsTo(claps[i])
                     .When(randomClap.IsEqualTo(i))
-                    .And(proximityVelocity.IsLessThan(0.35f));
+                    .And(proximityVelocity.IsLessThan(0.6f));
                 claps[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
-                    .When(traveled.IsLessThan(-0.03f));
+                    .When(traveled.IsLessThan(-0.03f))
+                    .Or()
+                    .When(proximity.IsLessThan(0.001f));
             }
+
+            if (debug)
+            {
+                var debugTransform = gameObject.transform.Find("Debug");
+                var debugLayer = controller.NewLayer("Debug");
+                debugLayer.NewState("Debug")
+                    .WithAnimation(aac.NewBlendTree().Direct()
+                        .WithAnimation(aac.NewBlendTree().Simple1D(proximity)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
+                                    new Vector3(1, 0, 1)), 0)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("P Bar").gameObject },
+                                    new Vector3(1, 1, 1)), 1), cb.Constant(1))
+                        .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
+                                    new Vector3(1, 0, 1)), 0)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("pV Bar").gameObject },
+                                    new Vector3(1, 1, 1)), 2 * 0.7f), cb.Constant(1))
+                        .WithAnimation(aac.NewBlendTree().Simple1D(proximityDelta)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
+                                    new Vector3(1, -1, 1)), -0.1f)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("dP Bar").gameObject },
+                                    new Vector3(1, 1, 1)), 0.1f), cb.Constant(1))
+                        .WithAnimation(aac.NewBlendTree().Simple1D(traveled)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
+                                    new Vector3(1, -1, 1)), -0.5f)
+                            .WithAnimation(aac.NewClip()
+                                .Scaling(new[] { debugTransform.Find("Trav Bar").gameObject },
+                                    new Vector3(1, 1, 1)), 0.5f), cb.Constant(1)));
+            }
+
             AssetDatabase.SaveAssets();
             return controller;
         }
@@ -636,7 +840,7 @@ namespace Wholesome
             ctr.controller.id = VrcfObjectId.ObjectToId(controller);
             ctr.controller.objRef = controller;
         }
-        
+
         private static List<AacFlState> CreateAudioStates(AacFlBase aac, AacFlLayer layer, Transform parentTransform)
         {
             var states = new List<AacFlState>();
@@ -655,9 +859,10 @@ namespace Wholesome
                     states.Add(state);
                 }
             }
+
             return states;
         }
-        
+
         [MenuItem("Wholesome/AAC Test")]
         private static void CreateStartEnd()
         {
@@ -690,13 +895,13 @@ namespace Wholesome
                     .Subtract(proximityDelta, smoothedProximity, lastProximity)
                     .Divide(proximityVelocity, proximityDelta, cb.FrameTime)
                     .BlendTree);
-            
+
             var startLayer = controller.NewLayer("Start");
             var start = startLayer.FloatParameter("Start");
             var startPlusOffset = startLayer.FloatParameter("Start+Offset");
             var startDiff = startLayer.FloatParameter("StartDiff");
             var startPlusOffsetDiff = startLayer.FloatParameter("Start+OffsetDiff");
-            
+
             var endLayer = controller.NewLayer("End");
             var end = endLayer.FloatParameter("End");
             var endMinusOffset = endLayer.FloatParameter("End-Offset");
@@ -715,7 +920,7 @@ namespace Wholesome
             startCheck.TransitionsTo(startSet)
                 .When(startDiff.IsLessThan(0));
             startSet.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
+
             var endCheck = endLayer.NewState("Check")
                 .WithAnimation(cb.DBT()
                     .Subtract(endDiff, end, proximity)
@@ -739,17 +944,17 @@ namespace Wholesome
 
             var resetLayer = controller.NewLayer("Resetter");
             var resetIdleStart = resetLayer.NewState("Idle Start");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                .BlendTree);*/
             var resetEnd = resetLayer.NewState("Reset End")
                 .WithAnimation(cb.DBT()
                     .Set0(end)
                     .BlendTree);
             var resetIdleEnd = resetLayer.NewState("Idle End");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                .BlendTree);*/
             var resetStart = resetLayer.NewState("Reset Start")
                 .WithAnimation(cb.DBT()
                     .Set(start, cb.Constant(1))
@@ -758,7 +963,7 @@ namespace Wholesome
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
             resetIdleEnd.TransitionsTo(resetStart).When(endMinusOffsetDiff.IsLessThan(0));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
+
             var sfxInLayer = controller.NewLayer("SFX In");
             var randomIn = sfxInLayer.IntParameter("Random In");
             var inIdle = sfxInLayer.NewState("Idle");
@@ -773,7 +978,6 @@ namespace Wholesome
                 ins[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(endMinusOffsetDiff.IsLessThan(0));
-
             }
 
             var sfxOutLayer = controller.NewLayer("SFX Out");
@@ -816,8 +1020,8 @@ namespace Wholesome
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(inertia.IsLessThan(-0.03f));
             }*/
-            
-            
+
+
             var debugLayer = controller.NewLayer("Debug");
             debugLayer.NewState("Debug")
                 .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
@@ -834,13 +1038,13 @@ namespace Wholesome
                     editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
                         .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
                 })).MotionTime(inertia);*/
-            
+
             cb.Hold(start);
             cb.Hold(end);
             AssetDatabase.SaveAssets();
             gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
         }
-        
+
         [MenuItem("Wholesome/AAC Delta Test")]
         private static void CreateDelta()
         {
@@ -880,27 +1084,27 @@ namespace Wholesome
 
             var resetLayer = controller.NewLayer("Resetter");
             var resetIdleStart = resetLayer.NewState("Idle Start");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(startPlusOffsetDiff, startPlusOffset, proximity)
+                .BlendTree);*/
             var resetEnd = resetLayer.NewState("Reset End")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
             var resetIdleEnd = resetLayer.NewState("Idle End");
-                /*.WithAnimation(cb.DBT()
-                    .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
-                    .BlendTree);*/
+            /*.WithAnimation(cb.DBT()
+                .Subtract(endMinusOffsetDiff, proximity, endMinusOffset)
+                .BlendTree);*/
             var resetStart = resetLayer.NewState("Reset Start")
                 .WithAnimation(cb.DBT()
                     .Set0(traveled)
                     .BlendTree);
-            
+
             resetIdleStart.TransitionsTo(resetEnd).When(proximityDelta.IsLessThan(0));
             resetEnd.TransitionsTo(resetIdleEnd).When(cb.Constant(1).IsGreaterThan(0));
             resetIdleEnd.TransitionsTo(resetStart).When(proximityDelta.IsGreaterThan(0));
             resetStart.Exits().When(cb.Constant(1).IsGreaterThan(0));
-            
+
             var sfxInLayer = controller.NewLayer("SFX In");
             var randomIn = sfxInLayer.IntParameter("Random In");
             var inIdle = sfxInLayer.NewState("Idle");
@@ -915,7 +1119,6 @@ namespace Wholesome
                 ins[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(traveled.IsLessThan(-0.01f));
-
             }
 
             var sfxOutLayer = controller.NewLayer("SFX Out");
@@ -955,8 +1158,8 @@ namespace Wholesome
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(traveled.IsLessThan(-0.01f));
             }
-            
-            
+
+
             var debugLayer = controller.NewLayer("Debug");
             debugLayer.NewState("Debug")
                 .WithAnimation(aac.NewBlendTree().Simple1D(proximityVelocity)
@@ -973,7 +1176,7 @@ namespace Wholesome
                     editClip.Animates(gameObject.transform.Find("Sender/Container"), "m_LocalScale.z")
                         .WithSecondsUnit(keyframes => { keyframes.Linear(0, 0).Linear(1, 1); });
                 })).MotionTime(inertia);*/
-            
+
             AssetDatabase.SaveAssets();
             gameObject.GetComponent<Animator>().runtimeAnimatorController = controller.AnimatorController;
         }
@@ -1060,7 +1263,7 @@ namespace Wholesome
 
             var maxInertia = inertiaLayer.FloatParameter("Max Inertia");
             var maxInertiaDelta = inertiaLayer.FloatParameter("Max Inertia Delta");
-            
+
             var a = inertiaLayer.FloatParameter("A");
             inertiaLayer.OverrideValue(a, 20);
             var b = inertiaLayer.FloatParameter("B");
@@ -1148,7 +1351,7 @@ namespace Wholesome
                     editClip.AnimatesAnimator(frameTime1000Param)
                         .WithOneFrame(1000);
                 });
-            
+
             var maxInertia1 = aac.NewClip()
                 .Animating(editClip =>
                 {
@@ -1247,6 +1450,7 @@ namespace Wholesome
                 so.FindProperty("m_NormalizedBlendValues").boolValue = true;
                 so.ApplyModifiedProperties();
             }
+
             inertiaLayer.NewState("Blend Tree")
                 .WithAnimation(aac.NewBlendTree()
                     .Direct()
@@ -1272,7 +1476,7 @@ namespace Wholesome
                     .WithAnimation(startPlusOffset1, startPlusOffset)
                     .WithAnimation(endMinusOffset1, endMinusOffset)
                 );
-            
+
             var inertia2Layer = sfx.NewLayer("Inertia2");
             var negative = inertia2Layer.NewState("Negative")
                 .WithAnimation(aac.NewBlendTree()
@@ -1294,7 +1498,7 @@ namespace Wholesome
                 );
             negative.TransitionsTo(positive).When(proximityDelta.IsGreaterThan(0));
             positive.TransitionsTo(negative).When(proximityDelta.IsLessThan(-0.0001f));
-            
+
             var maxInertiaLayer = sfx.NewLayer("Max Inertia");
             var maxInertiaIdle = maxInertiaLayer.NewState("Idle")
                 .WithAnimation(aac.NewBlendTree().Direct()
@@ -1312,7 +1516,7 @@ namespace Wholesome
             maxInertiaSet.Exits().When(one.IsGreaterThan(0));
             maxInertiaReset.Exits().When(one.IsGreaterThan(0));
 
-            
+
             var startProximityLayer = sfx.NewLayer("Start Proximity");
             var startProximityIdle = startProximityLayer.NewState("Idle")
                 .WithAnimation(aac.NewBlendTree().Direct()
@@ -1335,7 +1539,7 @@ namespace Wholesome
                 .When(endDiff.IsLessThan(0));
             startProximitySet.Exits().When(one.IsGreaterThan(0));
             startProximityReset.Exits().When(one.IsGreaterThan(0));
-            
+
             var endProximityLayer = sfx.NewLayer("End Proximity");
             var endProximityIdle = endProximityLayer.NewState("Idle")
                 .WithAnimation(aac.NewBlendTree().Direct()
@@ -1367,11 +1571,10 @@ namespace Wholesome
             {
                 inIdle.TransitionsTo(ins[i])
                     .When(randomIn.IsEqualTo(i))
-                    .And(inertia.IsGreaterThan(0.03f/*0.07f*/));
+                    .And(inertia.IsGreaterThan(0.03f /*0.07f*/));
                 ins[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(inertia.IsLessThan(-0.03f));
-
             }
 
             var sfxOutLayer = sfx.NewLayer("SFX Out");
@@ -1384,7 +1587,7 @@ namespace Wholesome
             {
                 outIdle.TransitionsTo(outs[i])
                     .When(randomOut.IsEqualTo(i))
-                    .And(inertia.IsLessThan(-0.03f/*0.07f*/));
+                    .And(inertia.IsLessThan(-0.03f /*0.07f*/));
                 outs[i].Exits()
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(inertia.IsGreaterThan(0.03f));
@@ -1414,7 +1617,7 @@ namespace Wholesome
                     .AfterAnimationIsAtLeastAtPercent(1)
                     .When(inertia.IsLessThan(-0.03f));
             }
-            
+
             /*for (var i = 0; i < ins.Count; i++)
             {
                 inIdle.TransitionsTo(ins[i])
@@ -1451,8 +1654,8 @@ namespace Wholesome
                 .When(sfxOn.IsEqualTo(true));
             sfxLayer.AnyTransitionsTo(off)
                 .When(sfxOn.IsEqualTo(false));*/
-            
-            
+
+
             /*
             var debugLayer = sfx.NewLayer("Debug");
             debugLayer.NewState("Debug")
@@ -1474,25 +1677,27 @@ namespace Wholesome
             gameObject.GetComponent<Animator>().runtimeAnimatorController = sfx.AnimatorController;
             if (vrcf)
             {
-                var controller = (gameObject.GetComponent<VRCFury>().config.features.Find(feature => feature is FullController) as
+                var controller = (gameObject.GetComponent<VRCFury>().config.features
+                        .Find(feature => feature is FullController) as
                     FullController).controllers[0];
                 controller.controller = sfx.AnimatorController;
                 controller.controller.id = VrcfObjectId.ObjectToId(sfx.AnimatorController);
                 controller.controller.objRef = sfx.AnimatorController;
             }
         }
-        
+
         [MenuItem("Wholesome/AAC")]
         private static void CreateAC()
         {
             var gameObject = Selection.activeGameObject;
             Create(gameObject);
         }
-        
+
         [MenuItem("Wholesome/AAC VRCF")]
         private static void CreateVRCFAC()
         {
-            var gameObject = PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+            var gameObject =
+                PrefabUtility.LoadPrefabContents("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
             Create(gameObject, true);
             PrefabUtility.SaveAsPrefabAsset(gameObject, "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
             PrefabUtility.UnloadPrefabContents(gameObject);
