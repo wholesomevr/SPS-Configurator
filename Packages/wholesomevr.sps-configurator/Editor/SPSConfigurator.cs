@@ -136,13 +136,64 @@ namespace Wholesome
             }
         }
 
+        class ParsedSockets
+        {
+            public Transform pussy;
+        }
+
+        private void ParseSockets(AvatarArmature armature)
+        {
+            var avatarObject = armature.AvatarObject;
+         
+            var furies = avatarObject.GetComponents<VRCFury>();
+            var moveMenus = furies
+                .SelectMany(fury =>
+                    fury.config.features.OfType<MoveMenuItem>()).ToList();
+            var toggles = furies
+                .SelectMany(fury =>
+                    fury.config.features.OfType<Toggle>()).ToList();
+            var setIcon = furies
+                .SelectMany(fury =>
+                    fury.config.features.OfType<SetIcon>()).ToList();
+            
+            var hips = armature.FindBone(HumanBodyBones.Hips);
+            var spsHips = hips.Find("SPS");
+            if (spsHips != null)
+            {
+                var pussy = spsHips.Find(PussyName);
+                VRCFuryHapticSocket socketPussy = null;
+                if (pussy != null) pussy.GetComponent<VRCFuryHapticSocket>();
+                List<VRCFuryHapticSocket.DepthAction> depthActions = null;
+                //if (socketPussy != null) depthActions = socketPussy.depthActions.Where(action => action.).ToList();
+                var anal = spsHips.Find(AnalName);
+                VRCFuryHapticSocket socketAnal = null;
+                if (anal != null) anal.GetComponent<VRCFuryHapticSocket>();
+            }
+
+            string spsPath = null;
+            var spsOptions = avatarObject.GetComponent<SpsOptions>();
+            if (spsOptions != null) spsPath = spsOptions.menuPath;
+            if (spsPath == null)
+            {
+                spsPath = moveMenus.FirstOrDefault(m => m.fromPath == "SPS")?.toPath;
+            }
+
+            var soundToggle = toggles.FirstOrDefault(t => t.globalParam == "WH_SFX_On");
+        }
+        
+        private Version CurrentVersion { get {
+            var packageInfo =
+                PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+            return new Version(packageInfo.version);
+        }}
+
         private (Object, Object) CopyAssets()
         {
             var packageInfo =
                 PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
             var dest = $"Assets/!Wholesome/SPS Configurator/{packageInfo.version}/SFX";
             var sfxSrcSuffix = "Packages/wholesomevr.sps-configurator/Assets/SFX/";
-            
+
             string SrcToDst(string path)
             {
                 var file = path.Substring(sfxSrcSuffix.Length);
@@ -162,6 +213,7 @@ namespace Wholesome
                         audioSource.clip = AssetDatabase.LoadAssetAtPath<AudioClip>(SrcToDst(clipSrcPath));
                     }
                 }
+
                 var vrcf = dstPrefab.GetComponent<VRCFury>();
                 var fullCtr = (vrcf.config.features.Find(ft => ft is FullController) as FullController).controllers[0];
                 var ctrSrc = fullCtr.controller.Get();
@@ -170,15 +222,17 @@ namespace Wholesome
                 {
                     var ctrDstPath = SrcToDst(ctrSrcPath);
                     var ctrDst = AssetDatabase.LoadAllAssetsAtPath(ctrDstPath).ToList()
-                        .Find(asset => asset is AnimatorController ctr && ctr.name == ctrSrc.name) as AnimatorController;
+                        .Find(asset =>
+                            asset is AnimatorController ctr && ctr.name == ctrSrc.name) as AnimatorController;
                     fullCtr.controller = ctrDst;
                     fullCtr.controller.id = VrcfObjectId.ObjectToId(ctrDst);
                     fullCtr.controller.objRef = ctrDst;
                     dstPrefab.GetComponent<Animator>().runtimeAnimatorController = ctrDst;
                 }
+
                 PrefabUtility.SavePrefabAsset(dstPrefab);
             }
-            
+
             var sfxPath = "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab";
             var sfxBJPath = "Packages/wholesomevr.sps-configurator/Assets/SFX/SFX BJ.prefab";
             var sfxDependencies = AssetDatabase.GetDependencies(sfxPath)
@@ -194,6 +248,7 @@ namespace Wholesome
                     AssetDatabase.CopyAsset(srcDependency, dstDependency);
                 }
             }
+
             ReplaceAssets("SFX.prefab");
             foreach (var srcDependency in sfxBJDependencies)
             {
@@ -204,6 +259,7 @@ namespace Wholesome
                     AssetDatabase.CopyAsset(srcDependency, dstDependency);
                 }
             }
+
             ReplaceAssets("SFX BJ.prefab");
 
             return (AssetDatabase.LoadAssetAtPath<Object>($"{dest}/SFX.prefab"),
@@ -473,6 +529,9 @@ namespace Wholesome
             var filteredSockets = sockets.Where(socket =>
                     names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS")
                 .ToDictionary(socket => socket.gameObject.name);
+            
+            // Delete SFX
+            
             foreach (var socket in filteredSockets.Values)
             {
                 socket.transform.SetParent(null, false);
@@ -489,6 +548,32 @@ namespace Wholesome
                 return obj;
             })
                 .ToDictionary(socket => socket.gameObject.name);*/
+        }
+
+        private Version GetSFXVersion(VRCFuryHapticSocket socket)
+        {
+            var sfx = socket.transform.Find("SFX");
+            if (sfx == null) return null;
+            var vrcFury = sfx.GetComponent<VRCFury>();
+            if (vrcFury == null) return null;
+            var ctr = vrcFury.config.features.OfType<FullController>().FirstOrDefault();
+            if (ctr == null) return null;
+            if (ctr.controllers.Count == 0) return null;
+            var animCtr = ctr.controllers[0].controller.Get();
+            if (animCtr == null) return null;
+            var ctrPath = AssetDatabase.GetAssetPath(animCtr);
+            var pathSplit = ctrPath.Split('/');
+            if (pathSplit.Length <= 3) return null;
+            var version = pathSplit[3];
+            return new Version(version);
+        }
+
+        private void DeleteSFXFromSocket(VRCFuryHapticSocket socket)
+        {
+            var sfx = socket.transform.Find("SFX");
+            var sfxToggle = socket.activeActions.actions.OfType<ObjectToggleAction>()
+                .FirstOrDefault(o => o.obj == sfx.gameObject);
+            var sfxDepth = socket.depthActions.OfType<FxFloatAction>().FirstOrDefault(fx => fx.name == "WH_SFX_Depth");
         }
 
         private void UpdateMenu()
@@ -674,21 +759,32 @@ namespace Wholesome
                         {
                             // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
                             var existingSFX = existingSocket.transform.Find("SFX BJ");
-                            if (existingSFX == null)
+                            Transform sfx;
+                            if (existingSFX != null)
                             {
-                                var sfx =
-                                    PrefabUtility.InstantiatePrefab(sfxBJPrefab,
-                                        existingSocket.transform) as GameObject;
-                                existingSocket.enableActiveAnimation = true;
-                                if (existingSocket.activeActions?.actions == null)
+                                var version = GetSFXVersion(existingSocket);
+                                if (version >= CurrentVersion)
                                 {
-                                    existingSocket.activeActions = new State();
+                                    sfx = existingSFX;
                                 }
-
-                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                else
                                 {
-                                    obj = sfx
-                                });
+                                    sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxBJPrefab,
+                                        existingSocket.transform)).transform;
+                                    Object.DestroyImmediate(existingSFX.gameObject);
+                                }
+                            }
+                            else
+                            {
+                                sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxBJPrefab,
+                                    existingSocket.transform)).transform;
+                            }
+                            
+                            existingSocket.enableDepthAnimations = true;
+                            if (!existingSocket.depthActions.Any(action =>
+                                    action.state.actions.Any(action2 =>
+                                        action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth_Blowjob")))
+                            {
                                 var fxState = new State();
                                 fxState.actions.Add(new FxFloatAction()
                                 {
@@ -703,27 +799,27 @@ namespace Wholesome
                                     smoothingSeconds = 0,
                                 });
                             }
-                            else
+
+                            existingSocket.enableActiveAnimation = true;
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
                             {
-                                // Add WHX_SFX_Depth animation if it doesn't exist
-                                if (!existingSocket.depthActions.Any(action =>
-                                        action.state.actions.Any(action2 =>
-                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth_Blowjob")))
+                                if (existingSocket.activeActions?.actions == null)
                                 {
-                                    var fxState = new State();
-                                    fxState.actions.Add(new FxFloatAction()
-                                    {
-                                        name = "WH_SFX_Depth_Blowjob"
-                                    });
-                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
-                                    {
-                                        state = fxState,
-                                        enableSelf = true,
-                                        startDistance = 0,
-                                        endDistance = -0.5f,
-                                        smoothingSeconds = 0,
-                                    });
+                                    existingSocket.activeActions = new State();
                                 }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx.gameObject
+                                });
+                                existingSocket.activeActions.actions.RemoveAll(action =>
+                                {
+                                    if (action is ObjectToggleAction o)
+                                    {
+                                        return o.obj == null;
+                                    }
+                                    return false;
+                                });
                             }
                         }
                     }
@@ -852,20 +948,32 @@ namespace Wholesome
                         {
                             // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
                             var existingSFX = existingSocket.transform.Find("SFX");
-                            if (existingSFX == null)
+                            Transform sfx;
+                            if (existingSFX != null)
                             {
-                                var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
-                                    existingSocket.transform) as GameObject;
-                                existingSocket.enableActiveAnimation = true;
-                                if (existingSocket.activeActions?.actions == null)
+                                var version = GetSFXVersion(existingSocket);
+                                if (version >= CurrentVersion)
                                 {
-                                    existingSocket.activeActions = new State();
+                                    sfx = existingSFX;
                                 }
-
-                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                else
                                 {
-                                    obj = sfx
-                                });
+                                    sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
+                                        existingSocket.transform)).transform;
+                                    Object.DestroyImmediate(existingSFX.gameObject);
+                                }
+                            }
+                            else
+                            {
+                                sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
+                                    existingSocket.transform)).transform;
+                            }
+                            
+                            existingSocket.enableDepthAnimations = true;
+                            if (!existingSocket.depthActions.Any(action =>
+                                    action.state.actions.Any(action2 =>
+                                        action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                            {
                                 var fxState = new State();
                                 fxState.actions.Add(new FxFloatAction()
                                 {
@@ -880,27 +988,27 @@ namespace Wholesome
                                     smoothingSeconds = 0,
                                 });
                             }
-                            else
+
+                            existingSocket.enableActiveAnimation = true;
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
                             {
-                                // Add WHX_SFX_Depth animation if it doesn't exist
-                                if (!existingSocket.depthActions.Any(action =>
-                                        action.state.actions.Any(action2 =>
-                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                                if (existingSocket.activeActions?.actions == null)
                                 {
-                                    var fxState = new State();
-                                    fxState.actions.Add(new FxFloatAction()
-                                    {
-                                        name = "WH_SFX_Depth"
-                                    });
-                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
-                                    {
-                                        state = fxState,
-                                        enableSelf = true,
-                                        startDistance = 0,
-                                        endDistance = -0.5f,
-                                        smoothingSeconds = 0,
-                                    });
+                                    existingSocket.activeActions = new State();
                                 }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx.gameObject
+                                });
+                                existingSocket.activeActions.actions.RemoveAll(action =>
+                                {
+                                    if (action is ObjectToggleAction o)
+                                    {
+                                        return o.obj == null;
+                                    }
+                                    return false;
+                                });
                             }
                         }
                     }
@@ -949,20 +1057,32 @@ namespace Wholesome
                         {
                             // TODO: Is this enough? Object toggle is null if SFX object is missing. No need to delete a None object toggle
                             var existingSFX = existingSocket.transform.Find("SFX");
-                            if (existingSFX == null)
+                            Transform sfx;
+                            if (existingSFX != null)
                             {
-                                var sfx = PrefabUtility.InstantiatePrefab(sfxPrefab,
-                                    existingSocket.transform) as GameObject;
-                                existingSocket.enableActiveAnimation = true;
-                                if (existingSocket.activeActions?.actions == null)
+                                var version = GetSFXVersion(existingSocket);
+                                if (version >= CurrentVersion)
                                 {
-                                    existingSocket.activeActions = new State();
+                                    sfx = existingSFX;
                                 }
-
-                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                else
                                 {
-                                    obj = sfx
-                                });
+                                    sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
+                                        existingSocket.transform)).transform;
+                                    Object.DestroyImmediate(existingSFX.gameObject);
+                                }
+                            }
+                            else
+                            {
+                                sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
+                                    existingSocket.transform)).transform;
+                            }
+                            
+                            existingSocket.enableDepthAnimations = true;
+                            if (!existingSocket.depthActions.Any(action =>
+                                    action.state.actions.Any(action2 =>
+                                        action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                            {
                                 var fxState = new State();
                                 fxState.actions.Add(new FxFloatAction()
                                 {
@@ -977,27 +1097,27 @@ namespace Wholesome
                                     smoothingSeconds = 0,
                                 });
                             }
-                            else
+
+                            existingSocket.enableActiveAnimation = true;
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
                             {
-                                // Add WHX_SFX_Depth animation if it doesn't exist
-                                if (!existingSocket.depthActions.Any(action =>
-                                        action.state.actions.Any(action2 =>
-                                            action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
+                                if (existingSocket.activeActions?.actions == null)
                                 {
-                                    var fxState = new State();
-                                    fxState.actions.Add(new FxFloatAction()
-                                    {
-                                        name = "WH_SFX_Depth"
-                                    });
-                                    existingSocket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
-                                    {
-                                        state = fxState,
-                                        enableSelf = true,
-                                        startDistance = 0,
-                                        endDistance = -0.5f,
-                                        smoothingSeconds = 0,
-                                    });
+                                    existingSocket.activeActions = new State();
                                 }
+
+                                existingSocket.activeActions.actions.Add(new ObjectToggleAction
+                                {
+                                    obj = sfx.gameObject
+                                });
+                                existingSocket.activeActions.actions.RemoveAll(action =>
+                                {
+                                    if (action is ObjectToggleAction o)
+                                    {
+                                        return o.obj == null;
+                                    }
+                                    return false;
+                                });
                             }
                         }
                     }
@@ -1738,6 +1858,7 @@ namespace Wholesome
             {
                 spsCost += SFX_SPS_COST;
             }
+
             if (defaultOn)
             {
                 if (blowjobOn)
