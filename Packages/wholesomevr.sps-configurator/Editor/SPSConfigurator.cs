@@ -136,27 +136,23 @@ namespace Wholesome
             }
         }
 
-        private VRCFuryHapticSocket GetPussyOrAnal(GameObject avatarObject)
+        private (VRCFuryHapticSocket, VRCFuryHapticSocket) GetPussyAndAnal(Transform hips)
         {
-            using (var armature = new AvatarArmature(avatarObject))
+            if (hips == null) return (null, null);
+            var pussy = hips.Find("SPS/Pussy");
+            VRCFuryHapticSocket pussySocket = null;
+            if(pussy != null)
             {
-                var hips = armature.FindBoneOrNull(HumanBodyBones.Hips);
-                if (hips == null) return null;
-                var pussy = hips.Find("SPS/Pussy");
-                if(pussy != null)
-                {
-                    var socket = pussy.GetComponent<VRCFuryHapticSocket>();
-                    return socket;
-                }
-            
-                var anal = hips.Find("SPS/Anal");
-                if(anal != null)
-                {
-                    var socket = anal.GetComponent<VRCFuryHapticSocket>();
-                    return socket;
-                }
+                pussySocket = pussy.GetComponent<VRCFuryHapticSocket>();
             }
-            return null;
+        
+            var anal = hips.Find("SPS/Anal");
+            VRCFuryHapticSocket analSocket = null;
+            if(anal != null)
+            {
+                analSocket = anal.GetComponent<VRCFuryHapticSocket>();
+            }
+            return (pussySocket, analSocket);
         }
 
         class ParsedSockets
@@ -585,6 +581,7 @@ namespace Wholesome
 
         private Version GetSFXVersion(VRCFuryHapticSocket socket)
         {
+            if (socket == null) return null;
             var sfx = socket.transform.Find("SFX");
             if (sfx == null) return null;
             var vrcFury = sfx.GetComponent<VRCFury>();
@@ -608,6 +605,16 @@ namespace Wholesome
                 Debug.LogError($"Couldn't parse SFX version: {e.Message}");
                 return null;
             }
+        }
+        
+        private bool HasSFX(Transform hips)
+        {
+            if (hips == null) return false;
+            var pussySFX = hips.Find("SPS/Pussy/SFX");
+            if (pussySFX != null) return true;
+            var analSFX = hips.Find("SPS/Anal/SFX");
+            if (pussySFX != null) return true;
+            return false;
         }
 
         private void DeleteSFXFromSocket(VRCFuryHapticSocket socket)
@@ -1716,14 +1723,35 @@ namespace Wholesome
             string note = null;
             if (selectedAvatar != null)
             {
-                var socket = GetPussyOrAnal(selectedAvatar.gameObject);
-                if (socket != null)
+                using (var armature = new AvatarArmature(selectedAvatar.gameObject))
                 {
-                    var sfxVer = GetSFXVersion(socket);
-                    if (sfxVer != null && sfxVer < CurrentVersion)
+                    var hips = armature.FindBoneOrNull(HumanBodyBones.Hips);
+                    if (hips != null)
                     {
-                        note = "Outdated SFX. Reapply to update!";
-                    }    
+                        var sockets = GetPussyAndAnal(hips);
+                        if (sockets.Item1 != null)
+                        {
+                            if (HasSFX(hips))
+                            {
+                                var sfxVer = GetSFXVersion(sockets.Item1);
+                                if (sfxVer == null || (sfxVer != null && sfxVer < CurrentVersion))
+                                {
+                                    note = "Outdated SFX. Reapply to update!";
+                                }   
+                            }
+                        }
+                        if (sockets.Item2 != null)
+                        {
+                            if (HasSFX(hips))
+                            {
+                                var sfxVer = GetSFXVersion(sockets.Item2);
+                                if (sfxVer == null || (sfxVer != null && sfxVer < CurrentVersion))
+                                {
+                                    note = "Outdated SFX. Reapply to update!";
+                                }   
+                            }
+                        }
+                    }
                 }
             }
             BeginCategory("Sound FX (Beta)", ref sfxOn, note);
