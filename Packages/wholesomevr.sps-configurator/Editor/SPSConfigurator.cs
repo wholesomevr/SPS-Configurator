@@ -140,7 +140,8 @@ namespace Wholesome
         {
             using (var armature = new AvatarArmature(avatarObject))
             {
-                var hips = armature.FindBone(HumanBodyBones.Hips);
+                var hips = armature.FindBoneOrNull(HumanBodyBones.Hips);
+                if (hips == null) return null;
                 var pussy = hips.Find("SPS/Pussy");
                 if(pussy != null)
                 {
@@ -426,6 +427,12 @@ namespace Wholesome
             {
                 return VRCFArmatureUtils.FindBoneOnArmatureOrException(AvatarObject, findBone).transform;
             }
+            
+            public Transform FindBoneOrNull(HumanBodyBones findBone)
+            {
+                var bone = VRCFArmatureUtils.FindBoneOnArmatureOrNull(AvatarObject, findBone);
+                return bone == null ? null : bone.transform;
+            }
 
             public Quaternion CalcAlignmentDelta(HumanBodyBones bone, Vector3 primaryTarget, Vector3 secondaryTarget)
             {
@@ -588,10 +595,19 @@ namespace Wholesome
             var animCtr = ctr.controllers[0].controller.Get();
             if (animCtr == null) return null;
             var ctrPath = AssetDatabase.GetAssetPath(animCtr);
+            if (!ctrPath.StartsWith("Assets/!Wholesome/SPS Configurator")) return null;
             var pathSplit = ctrPath.Split('/');
             if (pathSplit.Length <= 3) return null;
             var version = pathSplit[3];
-            return new Version(version);
+            try
+            {
+                return new Version(version);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"Couldn't parse SFX version: {e.Message}");
+                return null;
+            }
         }
 
         private void DeleteSFXFromSocket(VRCFuryHapticSocket socket)
@@ -789,7 +805,7 @@ namespace Wholesome
                             if (existingSFX != null)
                             {
                                 var version = GetSFXVersion(existingSocket);
-                                if (version >= CurrentVersion)
+                                if (version != null && version >= CurrentVersion)
                                 {
                                     sfx = existingSFX;
                                 }
@@ -980,7 +996,7 @@ namespace Wholesome
                             if (existingSFX != null)
                             {
                                 var version = GetSFXVersion(existingSocket);
-                                if (version >= CurrentVersion)
+                                if (version != null && version >= CurrentVersion)
                                 {
                                     sfx = existingSFX;
                                 }
@@ -1091,7 +1107,7 @@ namespace Wholesome
                             if (existingSFX != null)
                             {
                                 var version = GetSFXVersion(existingSocket);
-                                if (version >= CurrentVersion)
+                                if (version != null && version >= CurrentVersion)
                                 {
                                     sfx = existingSFX;
                                 }
