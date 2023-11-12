@@ -227,7 +227,7 @@ namespace Wholesome
             void ReplaceAssets(string file)
             {
                 var dstPrefab = AssetDatabase.LoadMainAssetAtPath($"{dest}/{file}") as GameObject;
-                var audios = dstPrefab.GetComponentsInChildren<AudioSource>();
+                var audios = dstPrefab.GetComponentsInChildren<AudioSource>(true);
                 foreach (var audioSource in audios)
                 {
                     var clipSrcPath = AssetDatabase.GetAssetPath(audioSource.clip);
@@ -296,12 +296,12 @@ namespace Wholesome
             categoryLabelBackground = new Texture2D(1, 1);
             categoryLabelBackground.SetPixel(0, 0, new Color(0.3f, 0.3f, 0.3f));
             categoryLabelBackground.Apply();
-            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
+            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         }
 
         public void OnSelectionChange()
         {
-            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>();
+            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
             Repaint();
         }
 
@@ -540,7 +540,7 @@ namespace Wholesome
                 AnalName, TitjobName, AssjobName, ThighjobName, $"{SoleName} Left", $"{SoleName} Right",
                 FootjobName
             };
-            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>();
+            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
             var socketCount = sockets.Count(socket =>
                 names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS");
             return socketCount > 0;
@@ -554,7 +554,7 @@ namespace Wholesome
                 AnalName, TitjobName, AssjobName, ThighjobName, $"{SoleName} Left", $"{SoleName} Right",
                 FootjobName
             };
-            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>();
+            var sockets = avatarObject.GetComponentsInChildren<VRCFuryHapticSocket>(true);
             var filteredSockets = sockets.Where(socket =>
                     names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS")
                 .ToDictionary(socket => socket.gameObject.name);
@@ -739,7 +739,7 @@ namespace Wholesome
             VRCAvatarDescriptor vrcAvatar = SelectedAvatar;
 
             var avatarGameObject = vrcAvatar.gameObject;
-            var meshes = vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
+            var meshes = vrcAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true)
                 .Where(mesh => mesh.transform.parent == avatarGameObject.transform)
                 .ToArray();
             var armature = new AvatarArmature(avatarGameObject);
@@ -1681,7 +1681,7 @@ namespace Wholesome
                     SetBlendshapes();
                     if (selectedAvatar != null)
                     {
-                        meshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>();
+                        meshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true);
                     }
                     else
                     {
@@ -1819,7 +1819,7 @@ namespace Wholesome
                         var animator = selectedAvatar.gameObject.GetComponent<Animator>();
                         Debug.Assert(animator != null, "No animator on the avatar");
                         var unityAvatar = animator.avatar;
-                        var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>()
+                        var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true)
                             .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
                             .ToArray();
                         var armature = new AvatarArmature(selectedAvatar.gameObject);
