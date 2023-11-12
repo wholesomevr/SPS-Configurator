@@ -136,6 +136,29 @@ namespace Wholesome
             }
         }
 
+        private string GetSPSMenuPath(GameObject avatarObject)
+        {
+            var furies = avatarObject.GetComponents<VRCFury>();
+            var allSpsOptions = furies
+                .SelectMany(fury =>
+                    fury.config.features.OfType<SpsOptions>()).ToList();
+            var spsOptions = allSpsOptions.FirstOrDefault();
+            if (spsOptions != null)
+            {
+                return spsOptions.menuPath;
+            }
+            var moveMenus = furies
+                .SelectMany(fury =>
+                    fury.config.features.OfType<MoveMenuItem>()).ToList();
+            var spsMoveMenu = moveMenus.FirstOrDefault(m => m.fromPath == "SPS");
+            if(spsMoveMenu != null)
+            {
+                return spsMoveMenu.toPath;
+            }
+
+            return "SPS";
+        }
+
         private (VRCFuryHapticSocket, VRCFuryHapticSocket) GetPussyAndAnal(Transform hips)
         {
             if (hips == null) return (null, null);
@@ -302,6 +325,15 @@ namespace Wholesome
         public void OnSelectionChange()
         {
             meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            var selectedAvatar = SelectedAvatar;
+            if (selectedAvatar != null)
+            {
+                spsMenuPath = GetSPSMenuPath(SelectedAvatar.gameObject);
+            }
+            else
+            {
+                spsMenuPath = "SPS";
+            }
             Repaint();
         }
 
