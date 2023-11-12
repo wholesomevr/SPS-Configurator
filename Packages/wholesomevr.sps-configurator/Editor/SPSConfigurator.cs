@@ -136,6 +136,28 @@ namespace Wholesome
             }
         }
 
+        private VRCFuryHapticSocket GetPussyOrAnal(GameObject avatarObject)
+        {
+            using (var armature = new AvatarArmature(avatarObject))
+            {
+                var hips = armature.FindBone(HumanBodyBones.Hips);
+                var pussy = hips.Find("SPS/Pussy");
+                if(pussy != null)
+                {
+                    var socket = pussy.GetComponent<VRCFuryHapticSocket>();
+                    return socket;
+                }
+            
+                var anal = hips.Find("SPS/Anal");
+                if(anal != null)
+                {
+                    var socket = anal.GetComponent<VRCFuryHapticSocket>();
+                    return socket;
+                }
+            }
+            return null;
+        }
+
         class ParsedSockets
         {
             public Transform pussy;
@@ -144,7 +166,7 @@ namespace Wholesome
         private void ParseSockets(AvatarArmature armature)
         {
             var avatarObject = armature.AvatarObject;
-         
+
             var furies = avatarObject.GetComponents<VRCFury>();
             var moveMenus = furies
                 .SelectMany(fury =>
@@ -155,7 +177,7 @@ namespace Wholesome
             var setIcon = furies
                 .SelectMany(fury =>
                     fury.config.features.OfType<SetIcon>()).ToList();
-            
+
             var hips = armature.FindBone(HumanBodyBones.Hips);
             var spsHips = hips.Find("SPS");
             if (spsHips != null)
@@ -180,12 +202,16 @@ namespace Wholesome
 
             var soundToggle = toggles.FirstOrDefault(t => t.globalParam == "WH_SFX_On");
         }
-        
-        private Version CurrentVersion { get {
-            var packageInfo =
-                PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
-            return new Version(packageInfo.version);
-        }}
+
+        private Version CurrentVersion
+        {
+            get
+            {
+                var packageInfo =
+                    PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
+                return new Version(packageInfo.version);
+            }
+        }
 
         private (Object, Object) CopyAssets()
         {
@@ -529,9 +555,9 @@ namespace Wholesome
             var filteredSockets = sockets.Where(socket =>
                     names.Contains(socket.gameObject.name) && socket.transform.parent.name == "SPS")
                 .ToDictionary(socket => socket.gameObject.name);
-            
+
             // Delete SFX
-            
+
             foreach (var socket in filteredSockets.Values)
             {
                 socket.transform.SetParent(null, false);
@@ -779,7 +805,7 @@ namespace Wholesome
                                 sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxBJPrefab,
                                     existingSocket.transform)).transform;
                             }
-                            
+
                             existingSocket.enableDepthAnimations = true;
                             if (!existingSocket.depthActions.Any(action =>
                                     action.state.actions.Any(action2 =>
@@ -801,7 +827,8 @@ namespace Wholesome
                             }
 
                             existingSocket.enableActiveAnimation = true;
-                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>()
+                                .All(o => o.obj != sfx.gameObject))
                             {
                                 if (existingSocket.activeActions?.actions == null)
                                 {
@@ -818,6 +845,7 @@ namespace Wholesome
                                     {
                                         return o.obj == null;
                                     }
+
                                     return false;
                                 });
                             }
@@ -968,7 +996,7 @@ namespace Wholesome
                                 sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
                                     existingSocket.transform)).transform;
                             }
-                            
+
                             existingSocket.enableDepthAnimations = true;
                             if (!existingSocket.depthActions.Any(action =>
                                     action.state.actions.Any(action2 =>
@@ -990,7 +1018,8 @@ namespace Wholesome
                             }
 
                             existingSocket.enableActiveAnimation = true;
-                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>()
+                                .All(o => o.obj != sfx.gameObject))
                             {
                                 if (existingSocket.activeActions?.actions == null)
                                 {
@@ -1007,6 +1036,7 @@ namespace Wholesome
                                     {
                                         return o.obj == null;
                                     }
+
                                     return false;
                                 });
                             }
@@ -1077,7 +1107,7 @@ namespace Wholesome
                                 sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab,
                                     existingSocket.transform)).transform;
                             }
-                            
+
                             existingSocket.enableDepthAnimations = true;
                             if (!existingSocket.depthActions.Any(action =>
                                     action.state.actions.Any(action2 =>
@@ -1099,7 +1129,8 @@ namespace Wholesome
                             }
 
                             existingSocket.enableActiveAnimation = true;
-                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject))
+                            if (existingSocket.activeActions.actions.OfType<ObjectToggleAction>()
+                                .All(o => o.obj != sfx.gameObject))
                             {
                                 if (existingSocket.activeActions?.actions == null)
                                 {
@@ -1116,6 +1147,7 @@ namespace Wholesome
                                     {
                                         return o.obj == null;
                                     }
+
                                     return false;
                                 });
                             }
@@ -1665,7 +1697,20 @@ namespace Wholesome
             EndCategory();
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
-            BeginCategory("Sound FX (Beta)", ref sfxOn);
+            string note = null;
+            if (selectedAvatar != null)
+            {
+                var socket = GetPussyOrAnal(selectedAvatar.gameObject);
+                if (socket != null)
+                {
+                    var sfxVer = GetSFXVersion(socket);
+                    if (sfxVer != null && sfxVer < CurrentVersion)
+                    {
+                        note = "Outdated SFX. Reapply to update!";
+                    }    
+                }
+            }
+            BeginCategory("Sound FX (Beta)", ref sfxOn, note);
             EditorGUILayout.BeginHorizontal();
             //sfxBlowjobOn = EditorGUILayout.ToggleLeft(BlowjobName, sfxBlowjobOn, GUILayout.Width(94));
             sfxPussyOn = EditorGUILayout.ToggleLeft(PussyName, sfxPussyOn, GUILayout.Width(94));
@@ -1800,13 +1845,19 @@ namespace Wholesome
             EditorGUILayout.EndHorizontal();
         }
 
-        private void BeginCategory(string categoryName, ref bool on)
+        private void BeginCategory(string categoryName, ref bool on, string note = null)
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
             var style = new GUIStyle(GUI.skin.box);
             style.normal.background = style.normal.scaledBackgrounds[0];
             EditorGUILayout.BeginHorizontal(style);
             on = EditorGUILayout.ToggleLeft(categoryName, on, EditorStyles.boldLabel);
+            if (note != null)
+            {
+                GUILayout.FlexibleSpace();
+                GUILayout.Label(note);
+            }
+
             EditorGUILayout.EndHorizontal();
             GUI.enabled = on;
             var togglesStyle = new GUIStyle(GUI.skin.label);
