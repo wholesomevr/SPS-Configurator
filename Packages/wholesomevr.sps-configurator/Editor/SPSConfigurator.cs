@@ -33,6 +33,8 @@ namespace Wholesome
 {
     public class SPSConfigurator : EditorWindow
     {
+        #pragma warning disable 0219
+        #pragma warning disable 0414
         enum FootType
         {
             Flat,
@@ -2078,5 +2080,7 @@ namespace Wholesome
             EditorGUILayout.EndVertical();
             EditorGUILayout.EndVertical();
         }
+#pragma warning restore 0219
+#pragma warning restore 0414
     }
 }
