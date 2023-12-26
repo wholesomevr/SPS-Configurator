@@ -154,7 +154,7 @@ namespace Wholesome
             }
         }
 
-        public Offset GetMouth(VRCAvatarDescriptor avatarDescriptor, Transform head)
+        public static Offset GetMouth(VRCAvatarDescriptor avatarDescriptor, Transform head)
         {
             var defaultPos = new Offset(
                 new Vector3(0, 0.01f, 0.075f),
@@ -172,7 +172,7 @@ namespace Wholesome
                 new Vector3());
         }
         
-        private Vector3 DetectMouthPosition(SkinnedMeshRenderer head, int ohBlendshapeIndex, Transform headBone)
+        private static Vector3 DetectMouthPosition(SkinnedMeshRenderer head, int ohBlendshapeIndex, Transform headBone)
         {
             var mesh = head.sharedMesh;
             var frames = head.sharedMesh.GetBlendShapeFrameCount(ohBlendshapeIndex);

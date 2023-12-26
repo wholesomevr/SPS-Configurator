@@ -853,7 +853,7 @@ namespace Wholesome
                 var socketCleaner = new SocketCleaner(avatarGameObject);
                 socketCleaner.Clean(parseResult.NewVersion, keepResult == 0);*/
                 var head = avatarArmature.FindBone(HumanBodyBones.Head);
-                var mouthOffset = avatarBase.GetMouth(vrcAvatar, head);
+                var mouthOffset = Base.GetMouth(vrcAvatar, head);
                 var rightHand = avatarArmature.FindBone(HumanBodyBones.RightHand);
                 avatarBase.AlignHands(armature);
                 
@@ -1927,13 +1927,6 @@ namespace Wholesome
                             throw;
                         }
                     }
-
-                    /*if (GUILayout.Button("Clear", GUILayout.Width(128), GUILayout.Height(32)))
-                    {
-                        var cleaner = new SocketCleaner(selectedAvatar.gameObject);
-                        cleaner.Clean(false);
-                        cleaner.Clean(true);
-                    }*/
                 }
 
                 GUILayout.FlexibleSpace();
@@ -1955,34 +1948,14 @@ namespace Wholesome
                             "Packages/wholesomevr.sps-configurator/Assets/Actual Wholesome Lollipop.prefab");
                         var initiatedPrefab =
                             PrefabUtility.InstantiatePrefab(testPrefab, selectedAvatar.transform) as GameObject;
-                        var animator = selectedAvatar.gameObject.GetComponent<Animator>();
-                        Debug.Assert(animator != null, "No animator on the avatar");
-                        var unityAvatar = animator.avatar;
-                        var avatarMeshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true)
-                            .Where(mesh => mesh.transform.parent == selectedAvatar.gameObject.transform)
-                            .ToArray();
-                        var armature = new AvatarArmature(selectedAvatar.gameObject);
-                        if (SelectedAvatar.lipSync == VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape)
+                        using (var avatarArmature = new AvatarArmature(selectedAvatar.gameObject))
                         {
-                            var visemOhBlendshapeName =
-                                SelectedAvatar.VisemeBlendShapes[(int)VRC_AvatarDescriptor.Viseme.oh];
-                            var mouthPosition = DetectMouthPosition(SelectedAvatar.VisemeSkinnedMesh,
-                                SelectedAvatar.VisemeSkinnedMesh.sharedMesh.GetBlendShapeIndex(
-                                    visemOhBlendshapeName), armature.FindBone(HumanBodyBones.Head));
-                            var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                            initiatedPrefab.transform.SetPositionAndRotation(position,
+                            var head = avatarArmature.FindBone(HumanBodyBones.Head);
+                            var mouthOffset = Base.GetMouth(selectedAvatar, head);
+                            var mouthPosition = head.TransformPoint(mouthOffset.Positon) + new Vector3(0, 0, 0.25f);
+                            initiatedPrefab.transform.SetPositionAndRotation(mouthPosition,
                                 Quaternion.AngleAxis(-180, Vector3.left));
                         }
-                        else
-                        {
-                            var mouthPosition = armature.FindBone(HumanBodyBones.Head)
-                                .TransformPoint(new Vector3(0, 0.01f, 0.075f));
-                            var position = mouthPosition + new Vector3(0, 0, 0.3f);
-                            initiatedPrefab.transform.SetPositionAndRotation(position,
-                                Quaternion.AngleAxis(-180, Vector3.left));
-                        }
-
-                        armature.Dispose();
                     }
                     catch (Exception e)
                     {
