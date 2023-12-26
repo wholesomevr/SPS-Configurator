@@ -3,9 +3,6 @@
     "com.vrcfury.vrcfury": {
       "version": "1.401.0"
     },
-    "com.vrchat.avatars": {
-      "version": "3.2.3"
-    },
     "com.poiyomi.toon": {
       "version": "8.1.167"
     },
@@ -23,21 +20,14 @@
     },
     "dev.hai-vr.animator-as-code.v1.vrchat": {
       "version": "1.0.9905"
+    },
+    "com.vrchat.avatars": {
+      "version": "3.5.0"
     }
   },
   "locked": {
     "com.vrcfury.vrcfury": {
-      "version": "1.511.0",
-      "dependencies": {}
-    },
-    "com.vrchat.avatars": {
-      "version": "3.4.1",
-      "dependencies": {
-        "com.vrchat.base": "3.4.1"
-      }
-    },
-    "com.vrchat.base": {
-      "version": "3.4.1",
+      "version": "1.660.0",
       "dependencies": {}
     },
     "com.poiyomi.toon": {
@@ -45,19 +35,19 @@
       "dependencies": {}
     },
     "vrchat.blackstartx.gesture-manager": {
-      "version": "3.8.7",
+      "version": "3.8.8",
       "dependencies": {
-        "com.vrchat.avatars": "3.2.x || 3.3.x || 3.4.x"
+        "com.vrchat.avatars": "3.2.x || 3.3.x || 3.4.x || 3.5.x"
       }
     },
     "com.vrchat.core.vpm-resolver": {
-      "version": "0.1.26",
+      "version": "0.1.27",
       "dependencies": {}
     },
     "lyuma.av3emulator": {
-      "version": "3.2.4",
+      "version": "3.3.0",
       "dependencies": {
-        "com.vrchat.avatars": ">=3.1.0 <3.5.0"
+        "com.vrchat.avatars": ">=3.1.0 <3.6.0"
       }
     },
     "dev.hai-vr.animator-as-code.v1": {
@@ -70,6 +60,16 @@
         "dev.hai-vr.animator-as-code.v1": "^1.0.0",
         "com.vrchat.avatars": "^3.3.0"
       }
+    },
+    "com.vrchat.avatars": {
+      "version": "3.5.0",
+      "dependencies": {
+        "com.vrchat.base": "3.5.0"
+      }
+    },
+    "com.vrchat.base": {
+      "version": "3.5.0",
+      "dependencies": {}
     }
   }
 }
