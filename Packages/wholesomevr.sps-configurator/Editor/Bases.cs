@@ -57,7 +57,7 @@ namespace Wholesome
 
         public static Base ToriBase = new Base
         {
-            Name = "Tori Base",
+            Name = "Tori",
             Hand = new Base.Offset(new Vector3(0, 0.0644f, -0.0307f), new Vector3(0, -90f, 0)),
             Pussy = new Base.Offset(new Vector3(0, -0.127297f, -0.01245906f), new Vector3(90, 0, 0)),
             Anal = new Base.Offset(new Vector3(0, -0.100751f, -0.05263702f), new Vector3(126.387f, 0, 0)),
@@ -125,9 +125,30 @@ namespace Wholesome
             AnalBlendshape = "Orifice2",
             DefaultHipLength = 0.0761f,
         };
+        
+        public static Base Venus = new Base
+        {
+            Name = "Venus",
+            Hand = new Base.Offset(new Vector3(-0.0000f, 0.0633f, -0.0253f), new Vector3(169.439f, 79.464f, 11.657f)),
+            Pussy = new Base.Offset(new Vector3(0.0000f, -0.0569f, 0.0183f), new Vector3(90.0000f, 0.0000f, 0.0000f)),
+            Anal = new Base.Offset(new Vector3(0.0000f, -0.0479f, -0.0146f), new Vector3(80.7675f, 180.0000f, 180.0000f)),
+            Titjob = new Base.Offset(new Vector3(0.0000f, 0.0690f, 0.1099f), new Vector3(86.8920f, 0.0000f, 0.0000f)),
+            Assjob = new Base.Offset(new Vector3(0.0000f, -0.0066f, -0.1191f), new Vector3(90.0000f, 0.0000f, 0.0000f)),
+            Thighjob = new Base.Offset(new Vector3(0.0000f, 0.0893f, 0.0000f), new Vector3(0.0000f, 0.0000f, 0.0000f)),
+            SoleFlat = new Base.Offset(new Vector3(0.0000f, 0.1181f, -0.0563f), new Vector3(21.5814f, 0.0000f, 0.0000f)),
+            SoleHeeled = new Base.Offset(new Vector3(0.0000f, 0.1324f, 0.0259f), new Vector3(67.6311f, 0.0000f, 0.0000f)),
+            FootjobFlat = new Base.Offset(new Vector3(0.0000f, 0.0548f, -0.0347f), new Vector3(292.7819f, 0.0000f, 0.0000f)),
+            FootjobHeeled = new Base.Offset(new Vector3(0.0000f, 0.0686f, -0.0016f), new Vector3(346.4218f, 0.0000f, 0.0000f)),
+            
+
+            PussyBlendshape = "Vagina Opening",
+            AnalBlendshape = "Ass Opening",
+            DefaultHipLength = 0.0929f,
+        };
 
 
-        public static readonly Base[] All = { Generic, Panda, ImLeXz, ToriBase, TVF, ZinFit, ZinRP };
+
+        public static readonly Base[] All = { Generic, Panda, ImLeXz, ToriBase, TVF, Venus, ZinFit, ZinRP };
         public static string[] Names => All.Select(b => b.Name).ToArray();
     }
 }

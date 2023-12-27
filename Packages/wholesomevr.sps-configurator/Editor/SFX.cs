@@ -18,25 +18,47 @@ namespace Wholesome
 {
     public class SFX
     {
-        private GameObject avatarObject;
-        private SPSConfigurator.AvatarArmature avatarArmature;
-
-        public SFX(GameObject avatarObject, SPSConfigurator.AvatarArmature avatarArmature)
+        public void Apply(Transform socketTransform)
         {
-            this.avatarObject = avatarObject;
-            this.avatarArmature = avatarArmature;
-        }
-
-        private Version CurrentVersion
-        {
-            get
+            var (sfxPrefab, sfxBJPrefab) = CopyAssets();
+            var socket = socketTransform.GetComponent<VRCFuryHapticSocket>();
+            var sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab, socketTransform)).transform;
+            socket.enableDepthAnimations = true;
+            var fxState = new State();
+            fxState.actions.Add(new FxFloatAction()
             {
-                var packageInfo =
-                    PackageInfo.FindForAssetPath("Packages/wholesomevr.sps-configurator/Assets/SFX/SFX.prefab");
-                return new Version(packageInfo.version);
-            }
+                name = "WH_SFX_Depth"
+            });
+            socket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
+            {
+                state = fxState,
+                enableSelf = true,
+                startDistance = 0,
+                endDistance = -0.5f,
+                smoothingSeconds = 0,
+            });
+
+            socket.enableActiveAnimation = true;
+            socket.activeActions = new State();
+            socket.activeActions.actions.Add(new ObjectToggleAction
+            {
+                obj = sfx.gameObject
+            });
         }
 
+        public void AddToggle(GameObject spsObject)
+        {
+            var fury = spsObject.AddComponent<VRCFury>();
+            fury.config.features.Add(new Toggle()
+            {
+                name = "SPS/Options/Sound FX",
+                saved = true,
+                defaultOn = true,
+                useGlobalParam = true,
+                globalParam = "WH_SFX_On"
+            });
+        }
+        
         private (Object, Object) CopyAssets()
         {
             var packageInfo =
@@ -114,116 +136,6 @@ namespace Wholesome
 
             return (AssetDatabase.LoadAssetAtPath<Object>($"{dest}/SFX.prefab"),
                 AssetDatabase.LoadAssetAtPath<Object>($"{dest}/SFX BJ.prefab"));
-        }
-
-        public void Apply(Transform socketTransform)
-        {
-            var (sfxPrefab, sfxBJPrefab) = CopyAssets();
-            var socket = socketTransform.GetComponent<VRCFuryHapticSocket>();
-            var existingSFX = socketTransform.Find("SFX");
-            Transform sfx;
-            if (existingSFX != null)
-            {
-                var version = GetSFXVersion(socket);
-                if (version != null && version >= CurrentVersion)
-                {
-                    sfx = existingSFX;
-                }
-                else
-                {
-                    sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab, socketTransform)).transform;
-                    Object.DestroyImmediate(existingSFX.gameObject);
-                }
-            }
-            else
-            {
-                sfx = ((GameObject)PrefabUtility.InstantiatePrefab(sfxPrefab, socketTransform)).transform;
-            }
-
-            socket.enableDepthAnimations = true;
-            if (!socket.depthActions.Any(action =>
-                    action.state.actions.Any(action2 =>
-                        action2 is FxFloatAction fx && fx.name == "WH_SFX_Depth")))
-            {
-                var fxState = new State();
-                fxState.actions.Add(new FxFloatAction()
-                {
-                    name = "WH_SFX_Depth"
-                });
-                socket.depthActions.Add(new VRCFuryHapticSocket.DepthAction
-                {
-                    state = fxState,
-                    enableSelf = true,
-                    startDistance = 0,
-                    endDistance = -0.5f,
-                    smoothingSeconds = 0,
-                });
-            }
-
-            socket.enableActiveAnimation = true;
-            if (socket.activeActions == null || socket.activeActions.actions.OfType<ObjectToggleAction>().All(o => o.obj != sfx.gameObject) )
-            {
-                if (socket.activeActions?.actions == null)
-                {
-                    socket.activeActions = new State();
-                }
-
-                socket.activeActions.actions.Add(new ObjectToggleAction
-                {
-                    obj = sfx.gameObject
-                });
-                socket.activeActions.actions.RemoveAll(action =>
-                {
-                    if (action is ObjectToggleAction o)
-                    {
-                        return o.obj == null;
-                    }
-
-                    return false;
-                });
-            }
-        }
-
-        private Version GetSFXVersion(VRCFuryHapticSocket socket)
-        {
-            if (socket == null) return null;
-            var sfx = socket.transform.Find("SFX");
-            if (sfx == null) return null;
-            var vrcFury = sfx.GetComponent<VRCFury>();
-            if (vrcFury == null) return null;
-            var ctr = vrcFury.config.features.OfType<FullController>().FirstOrDefault();
-            if (ctr == null) return null;
-            if (ctr.controllers.Count == 0) return null;
-            var animCtr = ctr.controllers[0].controller.Get();
-            if (animCtr == null) return null;
-            var ctrPath = AssetDatabase.GetAssetPath(animCtr);
-            if (!ctrPath.StartsWith("Assets/!Wholesome/SPS Configurator")) return null;
-            var pathSplit = ctrPath.Split('/');
-            if (pathSplit.Length <= 3) return null;
-            var version = pathSplit[3];
-            try
-            {
-                return new Version(version);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Couldn't parse SFX version: {e.Message}");
-                return null;
-            }
-        }
-
-        public void Clean()
-        {
-        }
-
-        private bool HasSFX(Transform hips)
-        {
-            if (hips == null) return false;
-            var pussySFX = hips.Find("SPS/Pussy/SFX");
-            if (pussySFX != null) return true;
-            var analSFX = hips.Find("SPS/Anal/SFX");
-            if (pussySFX != null) return true;
-            return false;
         }
     }
 }
