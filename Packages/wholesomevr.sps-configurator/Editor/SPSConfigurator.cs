@@ -298,9 +298,9 @@ namespace Wholesome
                 var socketBuilder = new SocketBuilder(avatarGameObject, avatarArmature);
                 if (defaultOn)
                 {
-                    if (blowjobOn) socketBuilder.Add(BlowjobName, mouthOffset, HumanBodyBones.Head, blendshape: blowjobBlendshape.ToString(), light: VRCFuryHapticSocket.AddLight.Hole);
-                    if (pussyOn) socketBuilder.Add(PussyName, avatarBase.Pussy, HumanBodyBones.Hips, blendshape: pussyBlendshape.ToString());
-                    if (analOn) socketBuilder.Add(AnalName, avatarBase.Anal, HumanBodyBones.Hips, blendshape: analBlendshape.ToString());
+                    if (blowjobOn) socketBuilder.Add(BlowjobName, mouthOffset, HumanBodyBones.Head, blendshape: blowjobBlendshape.ToString(), light: VRCFuryHapticSocket.AddLight.Hole, auto: true);
+                    if (pussyOn) socketBuilder.Add(PussyName, avatarBase.Pussy, HumanBodyBones.Hips, blendshape: pussyBlendshape.ToString(), light: VRCFuryHapticSocket.AddLight.Hole, auto: true);
+                    if (analOn) socketBuilder.Add(AnalName, avatarBase.Anal, HumanBodyBones.Hips, blendshape: analBlendshape.ToString(), light: VRCFuryHapticSocket.AddLight.Hole);
                     if (handjobOn)
                     {
                         if (handjobRightOn)
@@ -323,9 +323,9 @@ namespace Wholesome
 
                 if (feetOn)
                 {
-                    if(soleRightOn) socketBuilder.Add(SoleRightName, avatarBase.GetSole(Side.Right, selectedFootType), HumanBodyBones.RightFoot, "Feet");
+                    if(soleRightOn) socketBuilder.Add(SoleRightName, avatarBase.GetSole(Side.Right, selectedFootType), HumanBodyBones.RightFoot, "Feet", auto: true);
                     if(footjobOn) socketBuilder.AddParent(FootjobName, avatarBase.GetFootjob(Side.Left, selectedFootType), avatarBase.GetFootjob(Side.Right, selectedFootType), HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot, "Feet");
-                    if(soleLeftOn) socketBuilder.Add(SoleLeftName, avatarBase.GetSole(Side.Left, selectedFootType), HumanBodyBones.LeftFoot, "Feet");
+                    if(soleLeftOn) socketBuilder.Add(SoleLeftName, avatarBase.GetSole(Side.Left, selectedFootType), HumanBodyBones.LeftFoot, "Feet", auto: true);
                     socketBuilder.AddCategoryIconSet("Feet");
                 }
                 if (sfxOn)
