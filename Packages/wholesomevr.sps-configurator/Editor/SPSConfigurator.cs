@@ -287,7 +287,8 @@ namespace Wholesome
                                  - armature.FindBone(HumanBodyBones.Hips).position).magnitude;
                 bakedScale = hipLength / avatarBase.DefaultHipLength; 
             }
-            
+
+            //var scale = bakedScale / avatarGameObject.transform.lossyScale.y;
             avatarBase.Scale(bakedScale);
             using (var avatarArmature = new AvatarArmature(avatarGameObject))
             {
