@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Animations;
 using VF.Component;
@@ -147,6 +148,7 @@ namespace Wholesome
             if (spsParent == null)
             {
                 var newSps = new GameObject("SPS");
+                Undo.RegisterCreatedObjectUndo(newSps, "Add Sockets");
                 newSps.transform.SetParent(avatarObject.transform, false);
                 spsParent = newSps.transform;
             }
