@@ -73,6 +73,7 @@ namespace Wholesome
             var catTransform = spsParent.Find(category);
             if (catTransform == null) return;
             var fury = catTransform.gameObject.AddComponent<VRCFury>();
+            fury.Version = 2;
             fury.config.features.Add(new SetIcon()
             {
                 path = $"{spsPath ?? "SPS"}/{category}",
@@ -112,6 +113,7 @@ namespace Wholesome
         private void SetArmatureLinkedOffset(GameObject gameObject, HumanBodyBones bone, Base.Offset offset)
         {
             var vrcf = gameObject.AddComponent<VRCFury>();
+            vrcf.Version = 2;
             vrcf.config.features.Add(new ArmatureLink()
             {
                 propBone = vrcf.gameObject,

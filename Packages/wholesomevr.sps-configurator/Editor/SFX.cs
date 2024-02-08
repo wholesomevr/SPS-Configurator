@@ -49,6 +49,7 @@ namespace Wholesome
         public void AddToggle(GameObject spsObject)
         {
             var fury = spsObject.AddComponent<VRCFury>();
+            fury.Version = 2;
             fury.config.features.Add(new Toggle()
             {
                 name = "SPS/Options/Sound FX",
