@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -87,8 +88,18 @@ namespace Wholesome
                     }
                 }
 
-                var vrcf = dstPrefab.GetComponent<VRCFury>();
-                var fullCtr = (vrcf.config.features.Find(ft => ft is FullController) as FullController).controllers[0];
+                var content = Type.GetType("VF.Model.VRCFury")?.GetField("content");
+                IEnumerable<FeatureModel> features;
+                if (content != null)
+                {
+                    features = dstPrefab.GetComponents<VRCFury>()
+                        .Select(vrcf => content.GetValue(vrcf) as FeatureModel);
+                }
+                else
+                {
+                    features = dstPrefab.GetComponent<VRCFury>().config.features;
+                }
+                var fullCtr = features.OfType<FullController>().FirstOrDefault().controllers[0];
                 var ctrSrc = fullCtr.controller.Get();
                 var ctrSrcPath = AssetDatabase.GetAssetPath(ctrSrc);
                 if (ctrSrcPath.StartsWith(sfxSrcSuffix))
