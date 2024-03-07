@@ -88,7 +88,7 @@ namespace Wholesome
                     }
                 }
 
-                var content = Type.GetType("VF.Model.VRCFury")?.GetField("content");
+                var content = typeof(VRCFury).GetField("content");
                 IEnumerable<FeatureModel> features;
                 if (content != null)
                 {
@@ -99,7 +99,12 @@ namespace Wholesome
                 {
                     features = dstPrefab.GetComponent<VRCFury>().config.features;
                 }
-                var fullCtr = features.OfType<FullController>().FirstOrDefault().controllers[0];
+
+                var vrcfFullCtr = features.OfType<FullController>().FirstOrDefault();
+                if (vrcfFullCtr == null)
+                    throw new Exception("SFX assets are corrupted. " +
+                                        "Delete !Wholesome/SPS Configurator directory and re-add sockets.");
+                var fullCtr = vrcfFullCtr.controllers[0];
                 var ctrSrc = fullCtr.controller.Get();
                 var ctrSrcPath = AssetDatabase.GetAssetPath(ctrSrc);
                 if (ctrSrcPath.StartsWith(sfxSrcSuffix))
