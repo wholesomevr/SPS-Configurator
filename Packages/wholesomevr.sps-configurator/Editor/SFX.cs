@@ -89,18 +89,20 @@ namespace Wholesome
                 }
 
                 var content = typeof(VRCFury).GetField("content");
-                IEnumerable<FeatureModel> features;
+                //IEnumerable<FeatureModel> features;
+                FullController vrcfFullCtr;
                 if (content != null)
                 {
-                    features = dstPrefab.GetComponents<VRCFury>()
-                        .Select(vrcf => content.GetValue(vrcf) as FeatureModel);
+                    vrcfFullCtr = dstPrefab.GetComponents<VRCFury>()
+                        .Select(vrcf => content.GetValue(vrcf) as FeatureModel).OfType<FullController>().FirstOrDefault();
+                    if (vrcfFullCtr == null) vrcfFullCtr = dstPrefab.GetComponent<VRCFury>().config.features.OfType<FullController>().FirstOrDefault();
                 }
                 else
                 {
-                    features = dstPrefab.GetComponent<VRCFury>().config.features;
+                    vrcfFullCtr = dstPrefab.GetComponent<VRCFury>().config.features.OfType<FullController>().FirstOrDefault();
                 }
 
-                var vrcfFullCtr = features.OfType<FullController>().FirstOrDefault();
+                //var vrcfFullCtr = features.OfType<FullController>().FirstOrDefault();
                 if (vrcfFullCtr == null)
                     throw new Exception("SFX assets are corrupted. " +
                                         "Delete !Wholesome/SPS Configurator directory and re-add sockets.");
