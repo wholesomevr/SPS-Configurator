@@ -175,6 +175,11 @@ namespace Wholesome
 
                         foreach (var mesh in meshes)
                         {
+                            if (mesh.sharedMesh == null) {
+                                Debug.LogWarning($"Mesh renderer of {mesh.name} has no mesh attached");
+                                continue;
+                            }
+
                             for (int j = 0; j < mesh.sharedMesh.blendShapeCount; j++)
                             {
                                 var blendshapeName = mesh.sharedMesh.GetBlendShapeName(j);
