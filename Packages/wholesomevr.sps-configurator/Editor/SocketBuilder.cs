@@ -33,6 +33,17 @@ namespace Wholesome
             return socket;
         }
 
+        public FurySocket Add(string name, Matrix4x4 mat, HumanBodyBones bone, string category = null,
+            string blendshape = null, bool auto = false,
+            FurySocket.Mode mode = FurySocket.Mode.Auto)
+        {
+            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape);
+            SetArmatureLinkedOffset(obj, bone, mat);
+            AddSocketToAvatar(obj, category);
+            obj.transform.localScale = Vector3.one;
+            return socket;
+        }
+
         // public void Add(string name, Locator.Pose pose, HumanBodyBones bone, string category = null,
         //     string blendshape = null, bool auto = false,
         //     FurySocket.Mode mode = FurySocket.Mode.Auto)
@@ -59,6 +70,33 @@ namespace Wholesome
 
             var targetRight = new GameObject($"{name} Target Right");
             SetArmatureLinkedOffset(targetRight, boneRight, offsetRight);
+            targetRight.transform.SetParent(gameObject.transform, true);
+
+            SetParentConstraint(obj, targetLeft.transform, targetRight.transform);
+            AddSocketToAvatar(gameObject, category);
+            targetRight.transform.localPosition =
+                Vector3.Scale(targetRight.transform.localPosition, gameObject.transform.localScale);
+            targetLeft.transform.localPosition =
+                Vector3.Scale(targetLeft.transform.localPosition, gameObject.transform.localScale);
+            gameObject.transform.localScale = Vector3.one;
+        }
+
+        public void AddParent(string name, Matrix4x4 matLeft, Matrix4x4 matRight, HumanBodyBones boneLeft,
+            HumanBodyBones boneRight, string category = null,
+            string blendshape = null, bool auto = false,
+            FurySocket.Mode mode = FurySocket.Mode.Auto)
+        {
+            var gameObject = new GameObject(name);
+            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape);
+            obj.name = $"{name} Socket";
+            obj.transform.SetParent(gameObject.transform, true);
+
+            var targetLeft = new GameObject($"{name} Target Left");
+            SetArmatureLinkedOffset(targetLeft, boneLeft, matLeft);
+            targetLeft.transform.SetParent(gameObject.transform, true);
+
+            var targetRight = new GameObject($"{name} Target Right");
+            SetArmatureLinkedOffset(targetRight, boneRight, matRight);
             targetRight.transform.SetParent(gameObject.transform, true);
 
             SetParentConstraint(obj, targetLeft.transform, targetRight.transform);
@@ -103,6 +141,25 @@ namespace Wholesome
             gameObject.transform.rotation = transform.rotation;
             gameObject.transform.Translate(offset.Positon);
             gameObject.transform.Rotate(offset.EulerAngles);
+        }
+
+        private void SetArmatureLinkedOffset(GameObject gameObject, HumanBodyBones bone, Matrix4x4 mat)
+        {
+            // var vrcf = gameObject.AddComponent<VRCFury>();
+            // vrcf.Version = 2;
+            // vrcf.config.features.Add(new ArmatureLink()
+            // {
+            //     propBone = vrcf.gameObject,
+            //     boneOnAvatar = bone,
+            //     Version = 5
+            // });
+            var link = FuryComponents.CreateArmatureLink(gameObject);
+            link.LinkTo(bone);
+            var transform = FuryUtils.GetBone(avatarObject, bone).transform;
+            //gameObject.transform.position = transform.TransformPoint(offset.Positon);
+            gameObject.transform.position = transform.position;
+            gameObject.transform.rotation = transform.rotation;
+            gameObject.transform.SetPositionAndRotation(mat.GetPosition(), mat.rotation);
         }
 
         // private void SetArmatureLinkedOffset(GameObject gameObject, HumanBodyBones bone, Locator.Pose pose)

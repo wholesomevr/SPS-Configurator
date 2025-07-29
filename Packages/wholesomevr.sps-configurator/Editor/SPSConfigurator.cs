@@ -15,6 +15,7 @@ namespace Wholesome
 {
     public class SPSConfigurator : EditorWindow
     {
+        private const float SOCKET_OFFSET = 0.015f;
         private static readonly string BlowjobName = "Blowjob";
         private static readonly string HandjobName = "Handjob";
         private static readonly string HandjobDoubleName = $"Double {HandjobName}";
@@ -30,8 +31,8 @@ namespace Wholesome
         private static readonly string SoleRightName = "Steppies Right";
         private static readonly string FootjobName = "Footjob";
 
-        private int selectedBase = 0;
-        private FootType selectedFootType = FootType.Flat;
+        // private int selectedBase = 0;
+        // private FootType selectedFootType = FootType.Flat;
         private Texture2D categoryLabelBackground;
 
         private Texture2D logo;
@@ -41,7 +42,7 @@ namespace Wholesome
         private bool feetOn = true;
 
         private bool blowjobOn = true;
-        private StringBuilder blowjobBlendshape = new StringBuilder("vrc.v_oh");
+        private StringBuilder blowjobBlendshape = new StringBuilder();
         private bool handjobOn = true;
         private bool handjobLeftOn = true;
         private bool handjobRightOn = true;
@@ -64,6 +65,8 @@ namespace Wholesome
         private bool sfxPussyOn = true;
         private bool sfxAnalOn = true;
         private Vector2 scrollPosition = new Vector2();
+        private SkinnedMeshRenderer bodyRenderer = null;
+        private SkinnedMeshRenderer headRenderer = null;
 
         [MenuItem("Tools/Wholesome/SPS Configurator")]
         public static void Open()
@@ -83,35 +86,30 @@ namespace Wholesome
             meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
         }
 
-        public void OnSelectionChange()
-        {
-            meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-            Repaint();
-        }
+        // public void OnSelectionChange()
+        // {
+        //     meshes = SelectedAvatar?.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+        //     Repaint();
+        // }
 
-        public void SetBlendshapes()
-        {
-            var @base = Bases.All[selectedBase];
-            pussyBlendshape.Clear();
-            pussyBlendshape.Append(@base.PussyBlendshape);
-            analBlendshape.Clear();
-            analBlendshape.Append(@base.AnalBlendshape);
-        }
+        // public void SetBlendshapes()
+        // {
+        //     var @base = Bases.All[selectedBase];
+        //     pussyBlendshape.Clear();
+        //     pussyBlendshape.Append(@base.PussyBlendshape);
+        //     analBlendshape.Clear();
+        //     analBlendshape.Append(@base.AnalBlendshape);
+        // }
 
         private VRCAvatarDescriptor SelectedAvatar
         {
             get
             {
                 VRCAvatarDescriptor selectedAvatar = null;
-                if (Selection.activeTransform != null)
+                // if (Selection.activeTransform != null)
+                if (bodyRenderer != null)
                 {
-                    var gameObject = Selection.activeTransform.gameObject;
-                    selectedAvatar = gameObject.GetComponent<VRCAvatarDescriptor>();
-                    if (selectedAvatar == null)
-                    {
-                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true)
-                            .FirstOrDefault(); // TODO: use last?
-                    }
+                    selectedAvatar = bodyRenderer.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault(); // TODO: use last?
                 }
 
                 return selectedAvatar;
@@ -154,7 +152,7 @@ namespace Wholesome
         }
 
 
-        private void DrawBlendshapeToggle(IEnumerable<SkinnedMeshRenderer> meshes, string name, ref bool on,
+        private void DrawBlendshapeToggle(SkinnedMeshRenderer renderer, string name, ref bool on,
             StringBuilder blendshape)
         {
             using (new EditorGUILayout.HorizontalScope())
@@ -163,7 +161,8 @@ namespace Wholesome
                 GUILayout.FlexibleSpace();
 
 
-                using (new EditorGUI.DisabledScope(!on || meshes == null))
+                // using (new EditorGUI.DisabledScope(!on || meshes == null))
+                using (new EditorGUI.DisabledScope(!on || renderer == null))
                 {
                     if (EditorGUILayout.DropdownButton(
                             new GUIContent(blendshape.Length > 0 ? blendshape.ToString() : "None"), FocusType.Keyboard,
@@ -173,21 +172,34 @@ namespace Wholesome
                         menu.AddItem(new GUIContent("None"),
                             blendshape.Length == 0, () => { blendshape.Clear(); });
 
-                        foreach (var mesh in meshes)
+                        // foreach (var mesh in meshes)
+                        // {
+                        //     for (int j = 0; j < mesh.sharedMesh.blendShapeCount; j++)
+                        //     {
+                        //         var blendshapeName = mesh.sharedMesh.GetBlendShapeName(j);
+                        //         var menuEntry = $"{mesh.name}/{blendshapeName}";
+                        //         menu.AddItem(new GUIContent(menuEntry),
+                        //             blendshape.ToString() == blendshapeName,
+                        //             blendshapeNameObject =>
+                        //             {
+                        //                 blendshape.Clear();
+                        //                 blendshape.Append(blendshapeNameObject as string);
+                        //             },
+                        //             blendshapeName);
+                        //     }
+                        // }
+                        for (int j = 0; j < renderer.sharedMesh.blendShapeCount; j++)
                         {
-                            for (int j = 0; j < mesh.sharedMesh.blendShapeCount; j++)
-                            {
-                                var blendshapeName = mesh.sharedMesh.GetBlendShapeName(j);
-                                var menuEntry = $"{mesh.name}/{blendshapeName}";
-                                menu.AddItem(new GUIContent(menuEntry),
-                                    blendshape.ToString() == blendshapeName,
-                                    blendshapeNameObject =>
-                                    {
-                                        blendshape.Clear();
-                                        blendshape.Append(blendshapeNameObject as string);
-                                    },
-                                    blendshapeName);
-                            }
+                            var blendshapeName = renderer.sharedMesh.GetBlendShapeName(j);
+                            var menuEntry = $"{blendshapeName}";
+                            menu.AddItem(new GUIContent(menuEntry),
+                                blendshape.ToString() == blendshapeName,
+                                blendshapeNameObject =>
+                                {
+                                    blendshape.Clear();
+                                    blendshape.Append(blendshapeNameObject as string);
+                                },
+                                blendshapeName);
                         }
 
                         menu.ShowAsContext();
@@ -198,98 +210,385 @@ namespace Wholesome
 
         private void Apply()
         {
-            var avatarBase = Bases.All[selectedBase].DeepCopy();
+            Debug.Assert(bodyRenderer != null);
+
+            // var avatarBase = Bases.All[selectedBase].DeepCopy();
             VRCAvatarDescriptor vrcAvatar = SelectedAvatar;
             var avatarGameObject = vrcAvatar.gameObject;
 
-            float bakedScale;
-            if (selectedBase == 0)
-            {
-                var torsoLength = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Hips)
-                    .transform
-                    .InverseTransformPoint(FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Neck).transform.position)
-                    .magnitude;
-                bakedScale = torsoLength / avatarBase.DefaultTorsoLength;
 
-            }
-            else
-            {
-                var hipLength = (FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Spine).transform.position
-                                 - FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Hips).transform.position).magnitude;
-                bakedScale = hipLength / avatarBase.DefaultHipLength;
-            }
+            // float bakedScale;
+            // if (selectedBase == 0)
+            // {
+            //     var torsoLength = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Hips)
+            //         .transform
+            //         .InverseTransformPoint(FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Neck).transform.position)
+            //         .magnitude;
+            //     bakedScale = torsoLength / avatarBase.DefaultTorsoLength;
 
-            //var scale = bakedScale / avatarGameObject.transform.lossyScale.y;
-            avatarBase.Scale(bakedScale);
+            // }
+            // else
+            // {
+            //     var hipLength = (FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Spine).transform.position
+            //                      - FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Hips).transform.position).magnitude;
+            //     bakedScale = hipLength / avatarBase.DefaultHipLength;
+            // }
 
-            var head = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Head).transform;
-            var mouthOffset = Base.GetMouth(vrcAvatar, head);
-            avatarBase.AlignHands(avatarGameObject);
-            // var locator = new Locator(avatarGameObject,avatarGameObject.transform.Find("Body").GetComponent<SkinnedMeshRenderer>());
+            // //var scale = bakedScale / avatarGameObject.transform.lossyScale.y;
+            // avatarBase.Scale(bakedScale);
+
+            // var head = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Head).transform;
+            // var mouthOffset = Base.GetMouth(vrcAvatar, head);
+            // avatarBase.AlignHands(avatarGameObject);
+            var locator = new Locator(avatarGameObject, bodyRenderer);
 
             var socketBuilder = new SocketBuilder(avatarGameObject);
             if (defaultOn)
             {
-                if (blowjobOn) socketBuilder.Add(BlowjobName, mouthOffset, HumanBodyBones.Head, blendshape: blowjobBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
+                // if (blowjobOn) socketBuilder.Add(BlowjobName, mouthOffset, HumanBodyBones.Head, blendshape: blowjobBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
+                if (blowjobOn)
+                {
+                    Matrix4x4 mat;
+                    var pos = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.Head).transform.position;
+                    var fallbackMat = Matrix4x4.TRS(pos + new Vector3(0, 0.05f, 0.1f), Quaternion.identity, new Vector3(1, 1, 1));
+                    if (headRenderer && !string.IsNullOrEmpty(blowjobBlendshape.ToString()))
+                    {
+                        var headLocator = new Locator(avatarGameObject, headRenderer);
+                        var res = headLocator.RaycastToBlendshape(blowjobBlendshape.ToString(), Vector3.forward, 0.1f, out Matrix4x4 matBs);
+                        if (res) mat = matBs;
+                        else mat = fallbackMat;
+                    }
+                    else
+                    {
+                        // TODO: Fallback
+                        mat = fallbackMat;
+                    }
+                    socketBuilder.Add(BlowjobName, mat, HumanBodyBones.Head, blendshape: blowjobBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
+
+                }
                 if (pussyOn)
                 {
-                    var socket = socketBuilder.Add(PussyName, avatarBase.Pussy, HumanBodyBones.Hips, blendshape: pussyBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
+                    Matrix4x4 mat;
+                    if (!string.IsNullOrEmpty(pussyBlendshape.ToString()))
+                    {
+                        var yPos = locator.GetMaxPosInAxis(HumanBodyBones.Hips, Locator.Axis.Y, -1, weightThreshold: 0.95f);
+                        // var hit = locator.RaycastToBlendshape(pussyBlendshape.ToString(), Vector3.down, 0.2f, out Vector3 pos);
+                        var hit = locator.RaycastAroundToBlendshape(pussyBlendshape.ToString(), Vector3.down, 0.1f, Locator.Axis.X, out Vector3 pos);
+                        // pos.y = yPos.y;
+                        if (!hit) mat = locator.GetLastPosInDir(HumanBodyBones.Hips, Vector3.up);
+                        else mat = Matrix4x4.TRS(pos, Quaternion.AngleAxis(90, Vector3.right), Vector3.one);
+                    }
+                    else
+                    {
+                        mat = locator.GetLastPosInDir(HumanBodyBones.Hips, Vector3.up);
+                    }
+
+                    FurySocket socket = socketBuilder.Add(PussyName, mat, HumanBodyBones.Hips, blendshape: pussyBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
                     if (sfxOn && sfxPussyOn)
                     {
                         var tf = socketBuilder.Get(PussyName);
                         SFX.Apply(tf.gameObject, socket);
                     }
-                    // Locator.Pose pose;
-                    // var hit = locator.RaycastToBlendshape(pussyBlendshape.ToString(), Quaternion.AngleAxis(1, Vector3.left) * Vector3.down, 0.2f, out pose);
-                    // if (hit)
-                    // {
-                    //     socketBuilder.Add(PussyName, pose, HumanBodyBones.Hips, blendshape: pussyBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
-                    // }
                 }
 
                 if (analOn)
                 {
-                    var socket = socketBuilder.Add(AnalName, avatarBase.Anal, HumanBodyBones.Hips, blendshape: analBlendshape.ToString(), mode: FurySocket.Mode.Hole);
+
+                    Matrix4x4 mat;
+                    if (!string.IsNullOrEmpty(analBlendshape.ToString()))
+                    {
+                        // var hit = locator.RaycastToBlendshape(analBlendshape.ToString(), Quaternion.AngleAxis(1, Vector3.left) * Vector3.down, 0.2f, out mat);
+                        // if (!hit)
+                        // {
+                        //     mat = locator.GetLastPosInDir(HumanBodyBones.Hips, Vector3.up);
+                        //     mat[2, 3] -= 0.02f;
+                        //     mat[2, 2] += 0.01f;
+                        // }
+                        var hit = locator.RaycastAroundToBlendshape(analBlendshape.ToString(), Quaternion.AngleAxis(5, Vector3.right) * Vector3.down, 0.05f, Locator.Axis.Z, out Vector3 pos);
+                        // pos.y = yPos.y;
+                        if (!hit) mat = locator.GetLastPosInDir(HumanBodyBones.Hips, Vector3.up);
+                        else mat = Matrix4x4.TRS(pos, Quaternion.AngleAxis(95, Vector3.right), Vector3.one);
+
+                    }
+                    else
+                    {
+                        mat = locator.GetLastPosInDir(HumanBodyBones.Hips, Vector3.up);
+                        mat[2, 3] -= 0.02f;
+                        mat[2, 2] += 0.01f;
+                    }
+
+                    FurySocket socket = socketBuilder.Add(AnalName, mat, HumanBodyBones.Hips, blendshape: analBlendshape.ToString(), mode: FurySocket.Mode.Hole, auto: true);
                     if (sfxOn && sfxAnalOn)
                     {
                         var tf = socketBuilder.Get(AnalName);
                         SFX.Apply(tf.gameObject, socket);
                     }
-                    // Locator.Pose pose;
-                    // var hit = locator.RaycastToBlendshape(analBlendshape.ToString(), Quaternion.AngleAxis(-5, Vector3.left) * Vector3.down, 0.2f, out pose);
-
-                    // if (hit)
-                    // {
-                    //     pose.Position += new Vector3(0, 0, 0.01f);
-                    //     socketBuilder.Add(AnalName, pose, HumanBodyBones.Hips, blendshape: analBlendshape.ToString(), mode: FurySocket.Mode.Hole);
-
-                    // }
                 }
                 if (handjobOn)
                 {
+                    Matrix4x4 GetHandMat(Vector3 origin, Vector3 target, Matrix4x4 originWorld)
+                    {
+                        // var wrist = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightHand);
+                        // var finger = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightMiddleProximal);
+                        var dir = target - origin;
+                        var center = origin + dir * 0.7f;
+                        var worldMat = originWorld;
+                        // var primaryAxis = Locator.GetDominantAxisInDir(dir, worldMat);
+                        // var zAxis = Locator.GetDominantAxisInDir(Vector3.back, worldMat);
+                        var secAxis = Locator.GetDominantAxisInDir(dir * -1, worldMat);
+
+                        // var zCol = worldMat.GetColumn((int)zAxis.Item1) * zAxis.Item2;
+                        var zCol = (Vector4)Vector3.back;
+                        var xCol = worldMat.GetColumn((int)secAxis.Item1) * secAxis.Item2;
+                        var yCol = (Vector4)Vector3.Cross((Vector3)zCol, (Vector3)xCol);
+                        // TODO: Check if basis is perpedicualr
+
+                        var ySign = Vector3.Dot((Vector3)yCol, Vector3.up) > 0 ? 1 : -1;
+                        // Math.Sign()
+                        var trans = new Vector4(center.x, center.y, center.z, 1);
+                        var mat = new Matrix4x4(xCol, yCol, zCol, trans);
+
+                        var raycastMat = mat * Matrix4x4.Translate(new Vector3(0, -0.1f * ySign, 0));
+
+                        var pos = (Vector3)locator.RaycastTarget(center, raycastMat.GetPosition());
+                        if (pos == null) pos = center;
+                        var transPos = new Vector4(pos.x, pos.y, pos.z, 1);
+                        mat.SetColumn(3, transPos);
+                        var mat1 = mat * Matrix4x4.Translate(new Vector3(0, -SOCKET_OFFSET * ySign, 0));
+
+                        return mat1;
+                    }
+
+                    var wristRight = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightHand).transform;
+                    var fingerRight = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightMiddleProximal).transform;
+                    var matRight = GetHandMat(wristRight.position, fingerRight.position, wristRight.localToWorldMatrix);
+                    var wristLeft = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftHand).transform;
+                    var fingerLeft = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftMiddleProximal).transform;
+                    var matLeft = GetHandMat(wristLeft.position, fingerLeft.position, wristLeft.localToWorldMatrix);
+
+
                     if (handjobRightOn)
-                        socketBuilder.Add(HandjobRightName, avatarBase.HandRight, HumanBodyBones.RightHand, category: "Handjob", auto: true);
+                    {
+                        // // socketBuilder.Add(HandjobRightName, avatarBase.HandRight, HumanBodyBones.RightHand, category: "Handjob", auto: true);
+                        // var wrist = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightHand);
+                        // var finger = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightMiddleProximal);
+                        // var dir = finger.transform.position - wrist.transform.position;
+                        // var center = wrist.transform.position + dir * 0.7f;
+                        // var worldMat = wrist.transform.localToWorldMatrix;
+                        // // var primaryAxis = Locator.GetDominantAxisInDir(dir, worldMat);
+                        // // var zAxis = Locator.GetDominantAxisInDir(Vector3.back, worldMat);
+                        // var secAxis = Locator.GetDominantAxisInDir(dir * -1, worldMat);
+
+                        // // var zCol = worldMat.GetColumn((int)zAxis.Item1) * zAxis.Item2;
+                        // var zCol = (Vector4)Vector3.back;
+                        // var xCol = worldMat.GetColumn((int)secAxis.Item1) * secAxis.Item2;
+                        // var yCol = (Vector4)Vector3.Cross((Vector3)zCol, (Vector3)xCol);
+                        // // TODO: Check if basis is perpedicualr
+
+                        // var ySign = Vector3.Dot((Vector3)yCol, Vector3.up) > 0 ? 1 : -1;
+                        // // Math.Sign()
+                        // var trans = new Vector4(center.x, center.y, center.z, 1);
+                        // var mat = new Matrix4x4(xCol, yCol, zCol, trans);
+
+                        // var raycastMat = mat * Matrix4x4.Translate(new Vector3(0, -0.1f * ySign, 0));
+
+                        // var pos = (Vector3)locator.RaycastTarget(center, raycastMat.GetPosition());
+                        // if (pos == null) pos = center;
+                        // var transPos = new Vector4(pos.x, pos.y, pos.z, 1);
+                        // mat.SetColumn(3, transPos);
+                        // var mat1 = mat * Matrix4x4.Translate(new Vector3(0, -SOCKET_OFFSET * ySign, 0));
+
+                        // socketBuilder.Add(HandjobRightName, mat1, HumanBodyBones.RightHand, category: "Handjob", auto: true);
+                        // var wrist = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightHand);
+                        // var finger = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightMiddleProximal);
+                        // var mat = GetHandMat(wrist.transform.position, finger.transform.position, wrist.transform.localToWorldMatrix);
+                        socketBuilder.Add(HandjobRightName, matRight, HumanBodyBones.RightHand, category: "Handjob", auto: true);
+
+                    }
                     if (handjobBothOn)
-                        socketBuilder.AddParent(HandjobDoubleName, avatarBase.HandLeft, avatarBase.HandRight,
+                        socketBuilder.AddParent(HandjobDoubleName, matLeft, matRight,
                             HumanBodyBones.LeftHand, HumanBodyBones.RightHand, "Handjob");
                     if (handjobLeftOn)
-                        socketBuilder.Add(HandjobLeftName, avatarBase.HandLeft, HumanBodyBones.LeftHand, category: "Handjob", auto: true);
+                    {
+                        // var wrist = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftHand);
+                        // var finger = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftMiddleProximal);
+                        // var dir = finger.transform.position - wrist.transform.position;
+                        // var center = wrist.transform.position + dir / 2;
+                        // var worldMat = wrist.transform.localToWorldMatrix;
+                        // var zAxis = Locator.GetDominantAxisInDir(Vector3.back, worldMat);
+                        // var secAxis = Locator.GetDominantAxisInDir(dir * -1, worldMat);
+
+                        // var zCol = worldMat.GetColumn((int)zAxis.Item1) * zAxis.Item2;
+                        // var xCol = worldMat.GetColumn((int)secAxis.Item1) * secAxis.Item2;
+                        // var yCol = (Vector4)Vector3.Cross((Vector3)zCol, (Vector3)xCol);
+
+                        // var trans = new Vector4(center.x, center.y, center.z, 1);
+                        // var mat = new Matrix4x4(xCol, yCol, zCol, trans);
+
+                        // var ySign = Vector3.Dot((Vector3)yCol, Vector3.up) > 0 ? 1 : -1;
+                        // var mat1 = mat * Matrix4x4.Translate(new Vector3(0, -SOCKET_OFFSET * ySign, 0));
+                        // var wrist = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftHand);
+                        // var finger = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftMiddleProximal);
+                        // var mat = GetHandMat(wrist.transform.position, finger.transform.position, wrist.transform.localToWorldMatrix);
+
+                        socketBuilder.Add(HandjobLeftName, matLeft, HumanBodyBones.LeftHand, category: "Handjob", auto: true);
+                    }
+                    // socketBuilder.Add(HandjobLeftName, avatarBase.HandLeft, HumanBodyBones.LeftHand, category: "Handjob", auto: true);
                     // socketBuilder.AddCategoryIconSet("Handjob");
                 }
             }
             if (specialOn)
             {
-                if (titjobOn) socketBuilder.Add(TitjobName, avatarBase.Titjob, HumanBodyBones.Chest, "Special");
-                if (assjobOn) socketBuilder.Add(AssjobName, avatarBase.Assjob, HumanBodyBones.Hips, "Special", mode: FurySocket.Mode.Ring);
-                if (thighjobOn) socketBuilder.AddParent(ThighjobName, avatarBase.ThighjobLeft, avatarBase.ThighjobRight, HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg, "Special");
+                if (titjobOn)
+                {
+                    var nipRight = locator.GetMaxPosInAxis(HumanBodyBones.Chest, Locator.Axis.Z, 1, 1);
+                    var nipLeft = locator.GetMaxPosInAxis(HumanBodyBones.Chest, Locator.Axis.Z, 1, -1);
+                    var mid = (nipRight - nipLeft) / 2 + nipLeft;
+                    var q = Quaternion.AngleAxis(90, Vector3.right);
+                    var pos = locator.RaycastTarget(mid, mid + Vector3.forward);
+                    if (pos == null) pos = mid;
+                    var mat = Matrix4x4.TRS((Vector3)pos, q, Vector3.one) * Matrix4x4.Translate(new Vector3(0, SOCKET_OFFSET, 0));
+                    socketBuilder.Add(TitjobName, mat, HumanBodyBones.Chest, "Special");
+                }
+                if (assjobOn)
+                {
+                    var cheekRight = locator.GetMaxPosInAxis(HumanBodyBones.Hips, Locator.Axis.Z, -1, 1);
+                    var cheekLeft = locator.GetMaxPosInAxis(HumanBodyBones.Hips, Locator.Axis.Z, -1, -1);
+                    var mid = (cheekRight - cheekLeft) / 2 + cheekLeft;
+                    var q = Quaternion.AngleAxis(90, Vector3.right);
+
+                    var pos = locator.RaycastTarget(mid, mid + Vector3.back);
+                    if (pos == null) pos = mid;
+
+                    var mat = Matrix4x4.Translate(new Vector3(0, 0, -SOCKET_OFFSET)) * Matrix4x4.TRS((Vector3)pos, q, Vector3.one);
+                    socketBuilder.Add(AssjobName, mat, HumanBodyBones.Hips, "Special", mode: FurySocket.Mode.Ring);
+                }
+                if (thighjobOn)
+                {
+                    var upperLegLeft = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftUpperLeg).transform.position;
+                    var lowerLegLeft = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.LeftLowerLeg).transform.position;
+                    var upperLegRight = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightUpperLeg).transform.position;
+                    var lowerLegRight = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightLowerLeg).transform.position;
+
+                    var posLeft = (lowerLegLeft - upperLegLeft) * 0.3f + upperLegLeft;
+                    var posRight = (lowerLegRight - upperLegRight) * 0.3f + upperLegRight;
+
+                    var q = Quaternion.AngleAxis(180, Vector3.right);
+
+                    var matLeft = Matrix4x4.TRS(posLeft, q, Vector3.one);
+                    var matRight = Matrix4x4.TRS(posRight, q, Vector3.one);
+
+                    socketBuilder.AddParent(ThighjobName, matLeft, matRight, HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg, "Special");
+                }
                 // socketBuilder.AddCategoryIconSet("Special");
             }
 
             if (feetOn)
             {
-                if (soleRightOn) socketBuilder.Add(SoleRightName, avatarBase.GetSole(Side.Right, selectedFootType), HumanBodyBones.RightFoot, "Feet", auto: true);
-                if (footjobOn) socketBuilder.AddParent(FootjobName, avatarBase.GetFootjob(Side.Left, selectedFootType), avatarBase.GetFootjob(Side.Right, selectedFootType), HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot, "Feet");
-                if (soleLeftOn) socketBuilder.Add(SoleLeftName, avatarBase.GetSole(Side.Left, selectedFootType), HumanBodyBones.LeftFoot, "Feet", auto: true);
+
+                Matrix4x4 GetSoleMat(HumanBodyBones human)
+                {
+                    var bone = FuryUtils.GetBone(avatarGameObject, human);
+                    var bonePos = bone.transform.position;
+
+                    var backPos = locator.GetMaxPosInAxis(human, Locator.Axis.Z, -1, 0, 0.5f);
+                    var frontPos = locator.GetMaxPosInAxis(human, Locator.Axis.Z, 1, 0, 0.5f);
+                    var mid = (frontPos - backPos) * 0.65f + backPos;
+                    mid.x = bonePos.x;
+
+
+                    var dirZ = frontPos - backPos;
+                    dirZ.x = 0;
+                    dirZ = dirZ.normalized;
+                    var dirY = Vector3.Cross(Vector3.right, dirZ);
+
+                    var hit = (RaycastHit)locator.Raycast(mid, mid + dirY);
+
+                    var leftPos = locator.GetMaxPosInAxis(human, Locator.Axis.X, -1, 0, 0.5f);
+                    var rightPos = locator.GetMaxPosInAxis(human, Locator.Axis.X, 1, 0, 0.5f);
+                    var width = rightPos.x - leftPos.x;
+                    var normal = locator.GetAvgNormalCloseToPoint(hit.point, hit.normal, 30, width / 4);
+                    var dirZNew = Vector3.Cross(Vector3.right, normal);
+                    var normalP = Vector3.Cross(dirZNew, Vector3.right);
+
+                    var colTrans = new Vector4(hit.point.x, hit.point.y, hit.point.z, 1);
+
+                    var mat = new Matrix4x4((Vector4)Vector3.right, (Vector4)normalP, (Vector4)dirZNew, colTrans) * Matrix4x4.Translate(new Vector3(0, 0.015f, 0));
+                    return mat;
+                }
+
+                var rightMat = GetSoleMat(HumanBodyBones.RightFoot);
+                var leftMat = GetSoleMat(HumanBodyBones.LeftFoot);
+                if (soleRightOn)
+                {
+                    // var backPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.Z, -1, 1, 0.5f);
+                    // var frontPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.Z, 1, 1, 0.5f);
+                    // var midZ = (frontPos - backPos) / 2 + backPos;
+                    // var dirZ = (frontPos - backPos).normalized;
+                    // var leftPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.X, -1, 1, 0.5f);
+                    // var rightPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.X, 1, 1, 0.5f);
+                    // var midX = (rightPos - leftPos) / 2 + leftPos;
+
+                    // var dirY = Vector3.Cross(dirZ, Vector3.right);
+                    // var colTrans = new Vector4(midX.x, midZ.y, midZ.z, 1);
+                    // var mat = new Matrix4x4((Vector4)Vector3.right, (Vector4)dirY, (Vector4)dirZ, colTrans);
+                    // var bone = FuryUtils.GetBone(avatarGameObject, HumanBodyBones.RightFoot);
+                    // var bonePos = bone.transform.position;
+
+                    // var backPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.Z, -1, 1, 0.5f);
+                    // var frontPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.Z, 1, 1, 0.5f);
+                    // var mid = (frontPos - backPos) * 0.65f + backPos;
+                    // mid.x = bonePos.x;
+
+
+                    // var dirZ = frontPos - backPos;
+                    // dirZ.x = 0;
+                    // dirZ = dirZ.normalized;
+                    // var dirY = Vector3.Cross(Vector3.right, dirZ);
+
+                    // var hit = (RaycastHit)locator.Raycast(mid, mid + dirY);
+
+                    // var leftPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.X, -1, 1, 0.5f);
+                    // var rightPos = locator.GetMaxPosInAxis(HumanBodyBones.RightFoot, Locator.Axis.X, 1, 1, 0.5f);
+                    // var width = rightPos.x - leftPos.x;
+                    // var normal = locator.GetAvgNormalCloseToPoint(hit.point, hit.normal, 30, width / 4);
+                    // var dirZNew = Vector3.Cross(Vector3.right, normal);
+                    // var normalP = Vector3.Cross(dirZNew, Vector3.right);
+
+                    // var colTrans = new Vector4(hit.point.x, hit.point.y, hit.point.z, 1);
+
+                    // var mat = new Matrix4x4((Vector4)Vector3.right, (Vector4)normalP, (Vector4)dirZNew, colTrans) * Matrix4x4.Translate(new Vector3(0, 0.015f, 0));
+
+                    // var (mid, dir) = locator.GetCenterInNormalDirection(HumanBodyBones.RightFoot, normal, 15);
+                    // dir.x = 0;
+                    // dir = dir.normalized;
+                    // var dirY = Vector3.Cross(Vector3.right, dir);
+
+                    // var (mid, dirY) = locator.GetCenterInNormalDirection(HumanBodyBones.RightFoot, normal, 15);
+                    // dirY.x = 0;
+                    // dirY = dirY.normalized;
+                    // var dirZNormal = Vector3.Cross(Vector3.right, dirY);
+
+                    // var colTrans = new Vector4(mid.x, mid.y, mid.z, 1);
+                    // var mat = new Matrix4x4((Vector4)Vector3.right, (Vector4)dirY, (Vector4)dirZNormal, colTrans);
+                    socketBuilder.Add(SoleRightName, rightMat, HumanBodyBones.RightFoot, "Feet", auto: true);
+                }
+                if (footjobOn)
+                {
+                    var centerRight = locator.GetAABBCenter(HumanBodyBones.RightFoot);
+                    var centerLeft = locator.GetAABBCenter(HumanBodyBones.LeftFoot);
+                    var qRight = Quaternion.Euler(new Vector3(-90, 0, 0)) * rightMat.rotation;
+                    var qLeft = Quaternion.Euler(new Vector3(-90, 0, 0)) * leftMat.rotation;
+
+                    var fjMatLeft = Matrix4x4.TRS(centerLeft, qLeft, Vector3.one);
+                    var fjMatRight = Matrix4x4.TRS(centerRight, qRight, Vector3.one);
+
+                    socketBuilder.AddParent(FootjobName, fjMatLeft, fjMatRight, HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot, "Feet");
+                }
+                if (soleLeftOn)
+                {
+                    socketBuilder.Add(SoleLeftName, leftMat, HumanBodyBones.LeftFoot, "Feet", auto: true);
+                }
                 // socketBuilder.AddCategoryIconSet("Feet");
             }
             if (sfxOn) SFX.AddToggle(socketBuilder.SpsObject);
@@ -314,7 +613,48 @@ namespace Wholesome
                     MessageType.Warning);
             }
 
-            var selectedAvatar = SelectedAvatar;
+            VRCAvatarDescriptor selectedAvatar = null;
+            using (var check = new EditorGUI.ChangeCheckScope())
+            {
+                bodyRenderer = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Body Mesh", bodyRenderer, typeof(SkinnedMeshRenderer), allowSceneObjects: true);
+                if (bodyRenderer)
+                {
+                    var gameObject = bodyRenderer.gameObject;
+                    selectedAvatar = gameObject.GetComponent<VRCAvatarDescriptor>();
+                    if (selectedAvatar == null)
+                    {
+                        selectedAvatar = gameObject.GetComponentsInParent<VRCAvatarDescriptor>(true).FirstOrDefault(); // TODO: use last?
+                    }
+                }
+
+                if (check.changed)
+                {
+                    blowjobBlendshape.Clear();
+                    pussyBlendshape.Clear();
+                    analBlendshape.Clear();
+                    headRenderer = null;
+                }
+                if (check.changed && selectedAvatar)
+                {
+                    if (selectedAvatar.lipSync == VRC.SDKBase.VRC_AvatarDescriptor.LipSyncStyle.VisemeBlendShape && selectedAvatar.VisemeSkinnedMesh != null)
+                    {
+                        headRenderer = selectedAvatar.VisemeSkinnedMesh;
+                        if (headRenderer != null && selectedAvatar.VisemeBlendShapes != null && selectedAvatar.VisemeBlendShapes.Length > (int)VRC.SDKBase.VRC_AvatarDescriptor.Viseme.oh)
+                        {
+                            var blendshapeName = selectedAvatar.VisemeBlendShapes[(int)VRC.SDKBase.VRC_AvatarDescriptor.Viseme.oh];
+                            if (!string.IsNullOrEmpty(blendshapeName))
+                            {
+                                blowjobBlendshape.Clear();
+                                blowjobBlendshape.Append(blendshapeName);
+                            }
+                        }
+                    }
+                }
+
+
+            }
+
+            // var selectedAvatar = SelectedAvatar;
 
             using (var scope = new EditorGUILayout.HorizontalScope())
             {
@@ -341,38 +681,39 @@ namespace Wholesome
                 GUILayout.Label(avatarLabel, labelStyle);
             }
 
+
             EditorGUILayout.Space(8);
 
-            using (var check = new EditorGUI.ChangeCheckScope())
-            {
-                selectedBase =
-                    GUILayout.Toolbar(selectedBase, Bases.All.Select(@base => @base.Name).ToArray(),
-                        GUILayout.Height(32));
-                if (check.changed)
-                {
-                    SetBlendshapes();
-                    if (selectedAvatar != null)
-                    {
-                        meshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-                    }
-                    else
-                    {
-                        meshes = null;
-                    }
-                }
-            }
+            // using (var check = new EditorGUI.ChangeCheckScope())
+            // {
+            //     selectedBase =
+            //         GUILayout.Toolbar(selectedBase, Bases.All.Select(@base => @base.Name).ToArray(),
+            //             GUILayout.Height(32));
+            //     if (check.changed)
+            //     {
+            //         SetBlendshapes();
+            //         if (selectedAvatar != null)
+            //         {
+            //             meshes = selectedAvatar.GetComponentsInChildren<SkinnedMeshRenderer>(true);
+            //         }
+            //         else
+            //         {
+            //             meshes = null;
+            //         }
+            //     }
+            // }
 
-            selectedFootType = (FootType)GUILayout.Toolbar((int)selectedFootType, new[] { "Flat", "Heeled" });
+            // selectedFootType = (FootType)GUILayout.Toolbar((int)selectedFootType, new[] { "Flat", "Heeled" });
 
             EditorGUILayout.Space();
             EditorGUILayout.BeginVertical();
             BeginCategory("Default", ref defaultOn);
             DrawLabels();
-            DrawBlendshapeToggle(meshes, BlowjobName, ref blowjobOn, blowjobBlendshape);
+            DrawBlendshapeToggle(headRenderer, BlowjobName, ref blowjobOn, blowjobBlendshape);
             DrawSymmetricBothToggle(HandjobName, ref handjobOn, ref handjobLeftOn, ref handjobRightOn,
                 ref handjobBothOn);
-            DrawBlendshapeToggle(meshes, PussyName, ref pussyOn, pussyBlendshape);
-            DrawBlendshapeToggle(meshes, AnalName, ref analOn, analBlendshape);
+            DrawBlendshapeToggle(bodyRenderer, PussyName, ref pussyOn, pussyBlendshape);
+            DrawBlendshapeToggle(bodyRenderer, AnalName, ref analOn, analBlendshape);
             EndCategory();
 
             EditorGUILayout.BeginHorizontal();
@@ -401,7 +742,7 @@ namespace Wholesome
             using (new EditorGUILayout.HorizontalScope())
             {
                 GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledScope(selectedAvatar == null))
+                using (new EditorGUI.DisabledScope(selectedAvatar == null || bodyRenderer == null))
                 {
                     if (GUILayout.Button("Add Sockets", GUILayout.Width(128), GUILayout.Height(32)))
                     {
