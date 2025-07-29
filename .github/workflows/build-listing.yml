@@ -41,7 +41,11 @@ jobs:
           repository: wholesomevr/package-list-action
           path: ${{env.pathToCi}}
           clean: false # otherwise the local repo will no longer be checked out
-          
+      - name: Setup .NET 6.x
+        uses: actions/setup-dotnet@v4
+        with:
+          # Semantic version range syntax or exact version of a dotnet version
+          dotnet-version: '6.x'
       - name: Restore Cache
         uses: actions/cache@v3
         with:
