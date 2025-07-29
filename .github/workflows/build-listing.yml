@@ -35,8 +35,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       
-      - uses: actions/checkout@v3 # check out this repo
-      - uses: actions/checkout@v3 # check out automation repo
+      - uses: actions/checkout@v4 # check out this repo
+      - uses: actions/checkout@v4 # check out automation repo
         with:
           repository: wholesomevr/package-list-action
           path: ${{env.pathToCi}}
@@ -56,13 +56,15 @@ jobs:
           VRCFURY_URL: ${{ steps.vrcf.outputs.RELEASE_URL }}
  
       - name: Setup Pages
-        uses: actions/configure-pages@v3
-        
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/configure-pages@v5
+      
+      # Upload the VPM Listing Website to GitHub Pages artifacts
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{env.listPublishDirectory}}
-          
+          path: ${{ env.listPublishDirectory }}
+      
+      # Deploy the uploaded VPM Listing Website to GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
