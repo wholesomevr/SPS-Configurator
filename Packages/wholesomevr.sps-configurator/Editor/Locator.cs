@@ -1,25 +1,31 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using com.vrcfury.api;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.Analytics;
+using UnityEngine.Rendering;
 
 namespace Wholesome
 {
-    public class Locator
+    public class Locator : IDisposable
     {
+        internal const float RaycastProxyWeldDistance = 0.002f;
+        internal const float RaycastSegmentEpsilon = 0.001f;
+        internal const bool DebugAddRaycastProxyMeshToScene = true;
+
         private GameObject avatarObject;
         public SkinnedMeshRenderer renderer;
         private Dictionary<HumanBodyBones, Transform> humanToBone;
+        private Mesh raycastProxyMesh;
+        private bool ownsRaycastProxyMesh;
 
         public Locator(GameObject avatarObject, SkinnedMeshRenderer renderer)
         {
             this.avatarObject = avatarObject;
             this.renderer = renderer;
+            raycastProxyMesh = BuildRaycastProxyMesh(renderer, out ownsRaycastProxyMesh);
+            AddRaycastProxyMeshToScene();
             this.humanToBone = new Dictionary<HumanBodyBones, Transform>();
             var humans = Enum.GetValues(typeof(HumanBodyBones));
             foreach (HumanBodyBones human in humans)
@@ -29,7 +35,7 @@ namespace Wholesome
                     var bone = FuryUtils.GetBone(avatarObject, human);
                     humanToBone.Add(human, bone.transform);
                 }
-                catch (Exception e)
+                catch
                 {
 
                 }
@@ -42,36 +48,234 @@ namespace Wholesome
             public Vector3 EulerAngles;
         }
 
-        public static RaycastHit? Raycast(Ray ray, Mesh mesh, Matrix4x4 matrix)
+        public void Dispose()
         {
-            var intersect = typeof(HandleUtility).GetMethod("IntersectRayMesh",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static);
-            object[] rayParams =
+            if (ownsRaycastProxyMesh && raycastProxyMesh != null)
             {
-                ray, mesh, matrix, null
-            };
-            var result = (bool)intersect.Invoke(null, rayParams);
-            if (result) return (RaycastHit)rayParams[3];
-            return null;
+                UnityEngine.Object.DestroyImmediate(raycastProxyMesh);
+                raycastProxyMesh = null;
+            }
         }
 
         public RaycastHit? Raycast(Vector3 origin, Vector3 target)
         {
-            return Raycast(new Ray(origin, target - origin), renderer.sharedMesh, renderer.localToWorldMatrix);
+            if (raycastProxyMesh == null) return null;
+
+            var direction = target - origin;
+            var maxDistance = direction.magnitude;
+            if (maxDistance <= Mathf.Epsilon) return null;
+
+            var hit = MeshRaycaster.Raycast(
+                raycastProxyMesh,
+                renderer.localToWorldMatrix,
+                new Ray(origin, direction),
+                out var hitPoint,
+                out var hitNormal,
+                out var hitDistance);
+            if (!hit || hitDistance > maxDistance + RaycastSegmentEpsilon) return null;
+
+            return new RaycastHit
+            {
+                point = hitPoint,
+                normal = hitNormal.normalized,
+                distance = hitDistance
+            };
         }
 
         public Vector3? RaycastTarget(Vector3 target, Vector3 offset)
         {
+            if (raycastProxyMesh == null) return null;
+
             var origin = offset;
             var direction = target - origin;
-            var g1 = new GameObject("origin");
-            var g2 = new GameObject("target");
-            g1.transform.position = origin;
-            g2.transform.position = target;
-            var res = MeshRaycaster.Raycast(renderer.sharedMesh, renderer.localToWorldMatrix, new Ray(origin, direction), out var hitPoint, out var hitNormal, out var hitDistance);
+            var maxDistance = direction.magnitude;
+            if (maxDistance <= Mathf.Epsilon) return null;
+
+            var res = MeshRaycaster.Raycast(
+                raycastProxyMesh,
+                renderer.localToWorldMatrix,
+                new Ray(origin, direction),
+                out var hitPoint,
+                out var hitNormal,
+                out var hitDistance);
+            if (!res || hitDistance > maxDistance + RaycastSegmentEpsilon) return null;
+
             return hitPoint;
-            // var hit = Raycast(new Ray(origin, direction), renderer.sharedMesh, renderer.localToWorldMatrix);
-            // return hit?.point;
+        }
+
+        private void AddRaycastProxyMeshToScene()
+        {
+            if (!DebugAddRaycastProxyMeshToScene || renderer == null || raycastProxyMesh == null) return;
+
+            const string objectName = "SPS Raycast Proxy Debug";
+            var existing = renderer.transform.Find(objectName);
+            if (existing != null)
+            {
+                Undo.DestroyObjectImmediate(existing.gameObject);
+            }
+
+            var debugObject = new GameObject(objectName)
+            {
+                tag = "EditorOnly",
+                layer = renderer.gameObject.layer
+            };
+            Undo.RegisterCreatedObjectUndo(debugObject, "Add Raycast Proxy Debug Mesh");
+
+            debugObject.transform.SetParent(renderer.transform, false);
+            debugObject.transform.localPosition = Vector3.zero;
+            debugObject.transform.localRotation = Quaternion.identity;
+            debugObject.transform.localScale = Vector3.one;
+
+            var meshFilter = debugObject.AddComponent<MeshFilter>();
+            var meshRenderer = debugObject.AddComponent<MeshRenderer>();
+            var debugMesh = UnityEngine.Object.Instantiate(raycastProxyMesh);
+            debugMesh.name = $"{raycastProxyMesh.name} Scene Debug";
+            debugMesh.hideFlags = HideFlags.None;
+            meshFilter.sharedMesh = debugMesh;
+
+            meshRenderer.sharedMaterial = GetDebugProxyMaterial(renderer);
+        }
+
+        private static Material GetDebugProxyMaterial(SkinnedMeshRenderer sourceRenderer)
+        {
+            var defaultMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Material.mat");
+            if (defaultMaterial != null) return defaultMaterial;
+
+            if (sourceRenderer.sharedMaterial != null) return sourceRenderer.sharedMaterial;
+
+            var shader = Shader.Find("Standard");
+            if (shader == null) return null;
+
+            return new Material(shader)
+            {
+                name = "SPS Raycast Proxy Debug Material",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+        }
+
+        private static Mesh BuildRaycastProxyMesh(SkinnedMeshRenderer renderer, out bool ownsMesh)
+        {
+            ownsMesh = false;
+            if (renderer == null || renderer.sharedMesh == null) return null;
+
+            var bakedMesh = new Mesh
+            {
+                name = $"{renderer.sharedMesh.name} Baked Raycast Proxy",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            renderer.BakeMesh(bakedMesh);
+            ownsMesh = true;
+
+            var weldedMesh = BuildWeldedRaycastMesh(bakedMesh, RaycastProxyWeldDistance);
+            if (weldedMesh == null) return bakedMesh;
+
+            UnityEngine.Object.DestroyImmediate(bakedMesh);
+            return weldedMesh;
+        }
+
+        private static Mesh BuildWeldedRaycastMesh(Mesh source, float weldDistance)
+        {
+            var verts = source.vertices;
+            var tris = source.triangles;
+            if (verts.Length == 0 || tris.Length == 0 || weldDistance <= 0f) return null;
+
+            var sqrWeldDistance = weldDistance * weldDistance;
+            var representatives = new List<Vector3>();
+            var sums = new List<Vector3>();
+            var counts = new List<int>();
+            var remap = new int[verts.Length];
+            var grid = new Dictionary<Vector3Int, List<int>>();
+
+            Vector3Int GetCell(Vector3 pos)
+            {
+                return new Vector3Int(
+                    Mathf.FloorToInt(pos.x / weldDistance),
+                    Mathf.FloorToInt(pos.y / weldDistance),
+                    Mathf.FloorToInt(pos.z / weldDistance));
+            }
+
+            for (var i = 0; i < verts.Length; i++)
+            {
+                var vertex = verts[i];
+                var cell = GetCell(vertex);
+                var found = -1;
+
+                for (var x = -1; x <= 1 && found < 0; x++)
+                {
+                    for (var y = -1; y <= 1 && found < 0; y++)
+                    {
+                        for (var z = -1; z <= 1 && found < 0; z++)
+                        {
+                            var key = cell + new Vector3Int(x, y, z);
+                            if (!grid.TryGetValue(key, out var candidates)) continue;
+
+                            foreach (var candidate in candidates)
+                            {
+                                if ((representatives[candidate] - vertex).sqrMagnitude <= sqrWeldDistance)
+                                {
+                                    found = candidate;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (found < 0)
+                {
+                    found = representatives.Count;
+                    representatives.Add(vertex);
+                    sums.Add(Vector3.zero);
+                    counts.Add(0);
+
+                    if (!grid.TryGetValue(cell, out var entries))
+                    {
+                        entries = new List<int>();
+                        grid[cell] = entries;
+                    }
+                    entries.Add(found);
+                }
+
+                remap[i] = found;
+                sums[found] += vertex;
+                counts[found]++;
+            }
+
+            var weldedVerts = new List<Vector3>(sums.Count);
+            for (var i = 0; i < sums.Count; i++)
+            {
+                weldedVerts.Add(sums[i] / counts[i]);
+            }
+
+            var weldedTris = new List<int>(tris.Length);
+            for (var i = 0; i < tris.Length; i += 3)
+            {
+                var a = remap[tris[i]];
+                var b = remap[tris[i + 1]];
+                var c = remap[tris[i + 2]];
+                if (a == b || b == c || c == a) continue;
+
+                weldedTris.Add(a);
+                weldedTris.Add(b);
+                weldedTris.Add(c);
+            }
+
+            if (weldedTris.Count == 0) return null;
+
+            var weldedMesh = new Mesh
+            {
+                name = $"{source.name} Welded",
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            if (weldedVerts.Count > 65535)
+            {
+                weldedMesh.indexFormat = IndexFormat.UInt32;
+            }
+            weldedMesh.SetVertices(weldedVerts);
+            weldedMesh.SetTriangles(weldedTris, 0);
+            weldedMesh.RecalculateNormals();
+            weldedMesh.RecalculateBounds();
+            return weldedMesh;
         }
 
         public static Vector3 GetCenter(params Vector3[] vectors)
@@ -309,7 +513,7 @@ namespace Wholesome
             var hip = FuryUtils.GetBone(avatarObject, HumanBodyBones.Hips).transform;
             var origin = hip.position + new Vector3(0, -0.05f, 0);
             var direction = Vector3.up;
-            var hit = Raycast(new Ray(origin, direction), renderer.sharedMesh, renderer.localToWorldMatrix);
+            var hit = Raycast(origin, origin + direction);
             return hit?.point;
         }
 

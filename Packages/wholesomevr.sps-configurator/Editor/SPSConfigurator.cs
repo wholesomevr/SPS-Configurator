@@ -241,6 +241,8 @@ namespace Wholesome
             // var mouthOffset = Base.GetMouth(vrcAvatar, head);
             // avatarBase.AlignHands(avatarGameObject);
             var locator = new Locator(avatarGameObject, bodyRenderer);
+            try
+            {
 
             var socketBuilder = new SocketBuilder(avatarGameObject);
             if (defaultOn)
@@ -253,10 +255,12 @@ namespace Wholesome
                     var fallbackMat = Matrix4x4.TRS(pos + new Vector3(0, 0.05f, 0.1f), Quaternion.identity, new Vector3(1, 1, 1));
                     if (headRenderer && !string.IsNullOrEmpty(blowjobBlendshape.ToString()))
                     {
-                        var headLocator = new Locator(avatarGameObject, headRenderer);
-                        var res = headLocator.RaycastToBlendshape(blowjobBlendshape.ToString(), Vector3.forward, 0.1f, out Matrix4x4 matBs);
-                        if (res) mat = matBs;
-                        else mat = fallbackMat;
+                        using (var headLocator = new Locator(avatarGameObject, headRenderer))
+                        {
+                            var res = headLocator.RaycastToBlendshape(blowjobBlendshape.ToString(), Vector3.forward, 0.1f, out Matrix4x4 matBs);
+                            if (res) mat = matBs;
+                            else mat = fallbackMat;
+                        }
                     }
                     else
                     {
@@ -350,8 +354,8 @@ namespace Wholesome
 
                         var raycastMat = mat * Matrix4x4.Translate(new Vector3(0, -0.1f * ySign, 0));
 
-                        var pos = (Vector3)locator.RaycastTarget(center, raycastMat.GetPosition());
-                        if (pos == null) pos = center;
+                        var hit = locator.RaycastTarget(center, raycastMat.GetPosition());
+                        var pos = hit ?? center;
                         var transPos = new Vector4(pos.x, pos.y, pos.z, 1);
                         mat.SetColumn(3, transPos);
                         var mat1 = mat * Matrix4x4.Translate(new Vector3(0, -SOCKET_OFFSET * ySign, 0));
@@ -502,16 +506,24 @@ namespace Wholesome
                     dirZ = dirZ.normalized;
                     var dirY = Vector3.Cross(Vector3.right, dirZ);
 
-                    var hit = (RaycastHit)locator.Raycast(mid, mid + dirY);
+                    var hit = locator.Raycast(mid, mid + dirY);
+                    if (hit == null)
+                    {
+                        return new Matrix4x4(
+                            (Vector4)Vector3.right,
+                            (Vector4)dirY,
+                            (Vector4)dirZ,
+                            new Vector4(mid.x, mid.y, mid.z, 1));
+                    }
 
                     var leftPos = locator.GetMaxPosInAxis(human, Locator.Axis.X, -1, 0, 0.5f);
                     var rightPos = locator.GetMaxPosInAxis(human, Locator.Axis.X, 1, 0, 0.5f);
                     var width = rightPos.x - leftPos.x;
-                    var normal = locator.GetAvgNormalCloseToPoint(hit.point, hit.normal, 30, width / 4);
+                    var normal = locator.GetAvgNormalCloseToPoint(hit.Value.point, hit.Value.normal, 30, width / 4);
                     var dirZNew = Vector3.Cross(Vector3.right, normal);
                     var normalP = Vector3.Cross(dirZNew, Vector3.right);
 
-                    var colTrans = new Vector4(hit.point.x, hit.point.y, hit.point.z, 1);
+                    var colTrans = new Vector4(hit.Value.point.x, hit.Value.point.y, hit.Value.point.z, 1);
 
                     var mat = new Matrix4x4((Vector4)Vector3.right, (Vector4)normalP, (Vector4)dirZNew, colTrans) * Matrix4x4.Translate(new Vector3(0, 0.015f, 0));
                     return mat;
@@ -592,6 +604,11 @@ namespace Wholesome
                 // socketBuilder.AddCategoryIconSet("Feet");
             }
             if (sfxOn) SFX.AddToggle(socketBuilder.SpsObject);
+            }
+            finally
+            {
+                locator.Dispose();
+            }
 
         }
 
