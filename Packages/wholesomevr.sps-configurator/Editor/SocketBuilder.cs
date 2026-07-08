@@ -121,7 +121,7 @@ namespace Wholesome
             var socket = FuryComponents.CreateSocket(obj);
             socket.SetMode(mode);
             socket.SetName(String.IsNullOrWhiteSpace(category) ? name : $"{category}/{name}");
-            if (useRadiusOffset) SetRadiusOffset(socket);
+            if (useRadiusOffset) TrySetRadiusOffset(socket, name);
             if (!auto) socket.SetAutoOff();
             if (blendshape == null) return (obj, socket);
 
@@ -130,36 +130,56 @@ namespace Wholesome
             return (obj, socket);
         }
 
-        private static void SetRadiusOffset(FurySocket socket)
+        private static void TrySetRadiusOffset(FurySocket socket, string socketName)
         {
-            if (FurySocketComponentField == null)
+            try
             {
-                throw new MissingFieldException(typeof(FurySocket).FullName, "s");
-            }
+                if (FurySocketComponentField == null)
+                {
+                    LogRadiusOffsetFailure(socketName, $"{typeof(FurySocket).FullName}.s was not found.");
+                    return;
+                }
 
-            var socketComponent = FurySocketComponentField.GetValue(socket);
-            if (socketComponent == null)
-            {
-                throw new InvalidOperationException("VRCFury socket wrapper did not contain an internal socket component.");
-            }
+                var socketComponent = FurySocketComponentField.GetValue(socket);
+                if (socketComponent == null)
+                {
+                    LogRadiusOffsetFailure(socketName,
+                        "VRCFury socket wrapper did not contain an internal socket component.");
+                    return;
+                }
 
-            var radiusOffsetField = socketComponent.GetType()
-                .GetField("useRadiusOffset", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (radiusOffsetField == null)
-            {
-                throw new MissingFieldException(socketComponent.GetType().FullName, "useRadiusOffset");
-            }
+                var radiusOffsetField = socketComponent.GetType()
+                    .GetField("useRadiusOffset", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (radiusOffsetField == null)
+                {
+                    LogRadiusOffsetFailure(socketName,
+                        $"{socketComponent.GetType().FullName}.useRadiusOffset was not found.");
+                    return;
+                }
 
-            if (radiusOffsetField.FieldType != typeof(bool))
-            {
-                throw new InvalidOperationException($"{socketComponent.GetType().FullName}.useRadiusOffset is not a bool field.");
-            }
+                if (radiusOffsetField.FieldType != typeof(bool))
+                {
+                    LogRadiusOffsetFailure(socketName,
+                        $"{socketComponent.GetType().FullName}.useRadiusOffset is not a bool field.");
+                    return;
+                }
 
-            radiusOffsetField.SetValue(socketComponent, true);
-            if (socketComponent is UnityEngine.Object unityObject)
-            {
-                EditorUtility.SetDirty(unityObject);
+                radiusOffsetField.SetValue(socketComponent, true);
+                if (socketComponent is UnityEngine.Object unityObject)
+                {
+                    EditorUtility.SetDirty(unityObject);
+                }
             }
+            catch (Exception e)
+            {
+                LogRadiusOffsetFailure(socketName, e.Message);
+            }
+        }
+
+        private static void LogRadiusOffsetFailure(string socketName, string reason)
+        {
+            Debug.LogWarning(
+                $"SPS Configurator failed to enable radius offset for socket '{socketName}'. Continuing without radius offset. {reason}");
         }
 
         private void SetArmatureLinkedOffset(GameObject gameObject, HumanBodyBones bone, Base.Offset offset)
