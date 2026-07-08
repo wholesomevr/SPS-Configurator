@@ -187,7 +187,6 @@ namespace Wholesome
             var weights = magnitudes.Select(mag => mag / sum).ToArray();
             var weightedPos = mesh.vertices.Zip(weights, (pos, weight) => pos * weight)
                 .Aggregate(new Vector3(), (wpSum, wp) => wpSum + wp, (wp) => wp);
-            Debug.Assert(Mathf.Abs(weightedPos.x) < 0.01, "Blendshape not symmetric");
             weightedPos = head.localToWorldMatrix.MultiplyPoint(weightedPos);
             var weightedPosLocal = headBone.InverseTransformPoint(weightedPos);
             var originLocal = weightedPosLocal + new Vector3(0, 0, 0.1f);

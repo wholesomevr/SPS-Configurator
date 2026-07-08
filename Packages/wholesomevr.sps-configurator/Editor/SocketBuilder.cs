@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Reflection;
 using com.vrcfury.api;
 using com.vrcfury.api.Components;
 using UnityEditor;
@@ -10,6 +11,9 @@ namespace Wholesome
 {
     public class SocketBuilder
     {
+        private static readonly FieldInfo FurySocketComponentField =
+            typeof(FurySocket).GetField("s", BindingFlags.Instance | BindingFlags.NonPublic);
+
         private GameObject avatarObject;
         private Transform spsParent;
 
@@ -24,9 +28,10 @@ namespace Wholesome
 
         public FurySocket Add(string name, Base.Offset offset, HumanBodyBones bone, string category = null,
             string blendshape = null, bool auto = false,
-            FurySocket.Mode mode = FurySocket.Mode.Auto)
+            FurySocket.Mode mode = FurySocket.Mode.Auto,
+            bool useRadiusOffset = false)
         {
-            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape);
+            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape, useRadiusOffset);
             SetArmatureLinkedOffset(obj, bone, offset);
             AddSocketToAvatar(obj, category);
             obj.transform.localScale = Vector3.one;
@@ -35,9 +40,10 @@ namespace Wholesome
 
         public FurySocket Add(string name, Matrix4x4 mat, HumanBodyBones bone, string category = null,
             string blendshape = null, bool auto = false,
-            FurySocket.Mode mode = FurySocket.Mode.Auto)
+            FurySocket.Mode mode = FurySocket.Mode.Auto,
+            bool useRadiusOffset = false)
         {
-            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape);
+            var (obj, socket) = CreateSocket(name, category, mode, auto, blendshape, useRadiusOffset);
             SetArmatureLinkedOffset(obj, bone, mat);
             AddSocketToAvatar(obj, category);
             obj.transform.localScale = Vector3.one;
@@ -109,18 +115,51 @@ namespace Wholesome
         }
 
         private (GameObject, FurySocket) CreateSocket(string name, string category, FurySocket.Mode mode,
-            bool auto, string blendshape)
+            bool auto, string blendshape, bool useRadiusOffset = false)
         {
             var obj = new GameObject(name);
             var socket = FuryComponents.CreateSocket(obj);
             socket.SetMode(mode);
             socket.SetName(String.IsNullOrWhiteSpace(category) ? name : $"{category}/{name}");
+            if (useRadiusOffset) SetRadiusOffset(socket);
             if (!auto) socket.SetAutoOff();
             if (blendshape == null) return (obj, socket);
 
             var action = socket.AddDepthActions(new Vector2(0.05f, 0), 0, true);
             action.AddBlendshape(blendshape, 100);
             return (obj, socket);
+        }
+
+        private static void SetRadiusOffset(FurySocket socket)
+        {
+            if (FurySocketComponentField == null)
+            {
+                throw new MissingFieldException(typeof(FurySocket).FullName, "s");
+            }
+
+            var socketComponent = FurySocketComponentField.GetValue(socket);
+            if (socketComponent == null)
+            {
+                throw new InvalidOperationException("VRCFury socket wrapper did not contain an internal socket component.");
+            }
+
+            var radiusOffsetField = socketComponent.GetType()
+                .GetField("useRadiusOffset", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (radiusOffsetField == null)
+            {
+                throw new MissingFieldException(socketComponent.GetType().FullName, "useRadiusOffset");
+            }
+
+            if (radiusOffsetField.FieldType != typeof(bool))
+            {
+                throw new InvalidOperationException($"{socketComponent.GetType().FullName}.useRadiusOffset is not a bool field.");
+            }
+
+            radiusOffsetField.SetValue(socketComponent, true);
+            if (socketComponent is UnityEngine.Object unityObject)
+            {
+                EditorUtility.SetDirty(unityObject);
+            }
         }
 
         private void SetArmatureLinkedOffset(GameObject gameObject, HumanBodyBones bone, Base.Offset offset)

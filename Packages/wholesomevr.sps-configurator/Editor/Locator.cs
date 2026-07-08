@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using com.vrcfury.api;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -10,13 +9,13 @@ namespace Wholesome
 {
     public class Locator : IDisposable
     {
-        internal const float RaycastProxyWeldDistance = 0.002f;
+        internal const float RaycastProxyWeldDistance = 0.004f;
         internal const float RaycastSegmentEpsilon = 0.001f;
-        internal const bool DebugAddRaycastProxyMeshToScene = true;
 
         private GameObject avatarObject;
         public SkinnedMeshRenderer renderer;
         private Dictionary<HumanBodyBones, Transform> humanToBone;
+        private Mesh bakedMesh;
         private Mesh raycastProxyMesh;
         private bool ownsRaycastProxyMesh;
 
@@ -24,8 +23,8 @@ namespace Wholesome
         {
             this.avatarObject = avatarObject;
             this.renderer = renderer;
-            raycastProxyMesh = BuildRaycastProxyMesh(renderer, out ownsRaycastProxyMesh);
-            AddRaycastProxyMeshToScene();
+            bakedMesh = BuildBakedMesh(renderer);
+            raycastProxyMesh = BuildRaycastProxyMesh(bakedMesh, out ownsRaycastProxyMesh);
             this.humanToBone = new Dictionary<HumanBodyBones, Transform>();
             var humans = Enum.GetValues(typeof(HumanBodyBones));
             foreach (HumanBodyBones human in humans)
@@ -55,6 +54,69 @@ namespace Wholesome
                 UnityEngine.Object.DestroyImmediate(raycastProxyMesh);
                 raycastProxyMesh = null;
             }
+            if (bakedMesh != null)
+            {
+                var raycastProxyUsesBakedMesh = raycastProxyMesh == bakedMesh;
+                UnityEngine.Object.DestroyImmediate(bakedMesh);
+                if (raycastProxyUsesBakedMesh) raycastProxyMesh = null;
+                bakedMesh = null;
+            }
+        }
+
+        internal Vector3 AvatarToWorldPoint(Vector3 localPoint)
+        {
+            return avatarObject.transform.TransformPoint(localPoint);
+        }
+
+        internal Vector3 WorldToAvatarPoint(Vector3 worldPoint)
+        {
+            return avatarObject.transform.InverseTransformPoint(worldPoint);
+        }
+
+        internal Vector3 AvatarToWorldVector(Vector3 localVector)
+        {
+            return avatarObject.transform.rotation * localVector;
+        }
+
+        internal Vector3 AvatarToWorldDirection(Vector3 localDirection)
+        {
+            var worldDirection = AvatarToWorldVector(localDirection);
+            return worldDirection.sqrMagnitude > Mathf.Epsilon ? worldDirection.normalized : Vector3.zero;
+        }
+
+        internal Quaternion AvatarToWorldRotation(Quaternion localRotation)
+        {
+            return avatarObject.transform.rotation * localRotation;
+        }
+
+        internal Quaternion AvatarLookRotation(Vector3 localForward)
+        {
+            return AvatarLookRotation(localForward, Vector3.up);
+        }
+
+        internal Quaternion AvatarLookRotation(Vector3 localForward, Vector3 localUp)
+        {
+            var worldForward = AvatarToWorldDirection(localForward);
+            var worldUp = AvatarToWorldDirection(localUp);
+
+            if (worldForward.sqrMagnitude <= Mathf.Epsilon) worldForward = avatarObject.transform.forward;
+            if (worldUp.sqrMagnitude <= Mathf.Epsilon) worldUp = avatarObject.transform.up;
+
+            if (Mathf.Abs(Vector3.Dot(worldForward, worldUp)) > 0.98f)
+            {
+                worldUp = AvatarToWorldDirection(Vector3.forward);
+                if (Mathf.Abs(Vector3.Dot(worldForward, worldUp)) > 0.98f)
+                {
+                    worldUp = AvatarToWorldDirection(Vector3.right);
+                }
+            }
+
+            return Quaternion.LookRotation(worldForward, worldUp);
+        }
+
+        internal Matrix4x4 AvatarTRS(Vector3 worldPosition, Quaternion localRotation)
+        {
+            return Matrix4x4.TRS(worldPosition, AvatarToWorldRotation(localRotation), Vector3.one);
         }
 
         public RaycastHit? Raycast(Vector3 origin, Vector3 target)
@@ -84,11 +146,11 @@ namespace Wholesome
 
         public Vector3? RaycastTarget(Vector3 target, Vector3 offset)
         {
-            if (raycastProxyMesh == null) return null;
-
             var origin = offset;
             var direction = target - origin;
-            var maxDistance = direction.magnitude;
+            var directionMagnitude = direction.magnitude;
+            var maxDistance = directionMagnitude * 2f;
+            if (raycastProxyMesh == null) return null;
             if (maxDistance <= Mathf.Epsilon) return null;
 
             var res = MeshRaycaster.Raycast(
@@ -103,73 +165,28 @@ namespace Wholesome
             return hitPoint;
         }
 
-        private void AddRaycastProxyMeshToScene()
+        private static Mesh BuildBakedMesh(SkinnedMeshRenderer renderer)
         {
-            if (!DebugAddRaycastProxyMeshToScene || renderer == null || raycastProxyMesh == null) return;
-
-            const string objectName = "SPS Raycast Proxy Debug";
-            var existing = renderer.transform.Find(objectName);
-            if (existing != null)
-            {
-                Undo.DestroyObjectImmediate(existing.gameObject);
-            }
-
-            var debugObject = new GameObject(objectName)
-            {
-                tag = "EditorOnly",
-                layer = renderer.gameObject.layer
-            };
-            Undo.RegisterCreatedObjectUndo(debugObject, "Add Raycast Proxy Debug Mesh");
-
-            debugObject.transform.SetParent(renderer.transform, false);
-            debugObject.transform.localPosition = Vector3.zero;
-            debugObject.transform.localRotation = Quaternion.identity;
-            debugObject.transform.localScale = Vector3.one;
-
-            var meshFilter = debugObject.AddComponent<MeshFilter>();
-            var meshRenderer = debugObject.AddComponent<MeshRenderer>();
-            var debugMesh = UnityEngine.Object.Instantiate(raycastProxyMesh);
-            debugMesh.name = $"{raycastProxyMesh.name} Scene Debug";
-            debugMesh.hideFlags = HideFlags.None;
-            meshFilter.sharedMesh = debugMesh;
-
-            meshRenderer.sharedMaterial = GetDebugProxyMaterial(renderer);
-        }
-
-        private static Material GetDebugProxyMaterial(SkinnedMeshRenderer sourceRenderer)
-        {
-            var defaultMaterial = AssetDatabase.GetBuiltinExtraResource<Material>("Default-Material.mat");
-            if (defaultMaterial != null) return defaultMaterial;
-
-            if (sourceRenderer.sharedMaterial != null) return sourceRenderer.sharedMaterial;
-
-            var shader = Shader.Find("Standard");
-            if (shader == null) return null;
-
-            return new Material(shader)
-            {
-                name = "SPS Raycast Proxy Debug Material",
-                hideFlags = HideFlags.HideAndDontSave
-            };
-        }
-
-        private static Mesh BuildRaycastProxyMesh(SkinnedMeshRenderer renderer, out bool ownsMesh)
-        {
-            ownsMesh = false;
             if (renderer == null || renderer.sharedMesh == null) return null;
 
-            var bakedMesh = new Mesh
+            var mesh = new Mesh
             {
-                name = $"{renderer.sharedMesh.name} Baked Raycast Proxy",
+                name = $"{renderer.sharedMesh.name} Baked Snapshot",
                 hideFlags = HideFlags.HideAndDontSave
             };
-            renderer.BakeMesh(bakedMesh);
-            ownsMesh = true;
+            renderer.BakeMesh(mesh);
+            return mesh;
+        }
+
+        private static Mesh BuildRaycastProxyMesh(Mesh bakedMesh, out bool ownsMesh)
+        {
+            ownsMesh = false;
+            if (bakedMesh == null) return null;
 
             var weldedMesh = BuildWeldedRaycastMesh(bakedMesh, RaycastProxyWeldDistance);
             if (weldedMesh == null) return bakedMesh;
 
-            UnityEngine.Object.DestroyImmediate(bakedMesh);
+            ownsMesh = true;
             return weldedMesh;
         }
 
@@ -278,6 +295,34 @@ namespace Wholesome
             return weldedMesh;
         }
 
+        private Mesh GetPositionMesh(Mesh sourceMesh)
+        {
+            if (bakedMesh != null && sourceMesh != null && bakedMesh.vertexCount == sourceMesh.vertexCount)
+            {
+                return bakedMesh;
+            }
+
+            return sourceMesh;
+        }
+
+        private static Vector3[] GetPositionNormals(Mesh positionMesh, Mesh sourceMesh)
+        {
+            var sourceVertexCount = sourceMesh != null ? sourceMesh.vertexCount : 0;
+            if (positionMesh != null)
+            {
+                var normals = positionMesh.normals;
+                if (normals.Length == sourceVertexCount) return normals;
+            }
+
+            if (sourceMesh != null)
+            {
+                var normals = sourceMesh.normals;
+                if (normals.Length == sourceVertexCount) return normals;
+            }
+
+            return Array.Empty<Vector3>();
+        }
+
         public static Vector3 GetCenter(params Vector3[] vectors)
         {
             var sum = Vector3.zero;
@@ -291,15 +336,15 @@ namespace Wholesome
         public Vector3 GetBlendshapeCenter(string blendshape)
         {
             var mesh = renderer.sharedMesh;
+            var positionMesh = GetPositionMesh(mesh);
             var deltaPositions = new Vector3[mesh.vertexCount];
             var blendshapeIdx = mesh.GetBlendShapeIndex(blendshape);
             mesh.GetBlendShapeFrameVertices(blendshapeIdx, 0, deltaPositions, null, null);
             var magnitudes = deltaPositions.Select(pos => pos.magnitude).ToArray();
             var sum = magnitudes.Sum();
             var weights = magnitudes.Select(mag => mag / sum).ToArray();
-            var weightedPos = mesh.vertices.Zip(weights, (pos, weight) => pos * weight)
+            var weightedPos = positionMesh.vertices.Zip(weights, (pos, weight) => pos * weight)
                 .Aggregate(new Vector3(), (wpSum, wp) => wpSum + wp, (wp) => wp);
-            // Debug.Assert(Mathf.Abs(weightedPos.x) < 0.01, "Blendshape not symmetric");
             var weightedPosWorld = renderer.localToWorldMatrix.MultiplyPoint(weightedPos);
             return weightedPosWorld;
         }
@@ -307,12 +352,12 @@ namespace Wholesome
         public bool RaycastToBlendshape(string blendshape, Vector3 normal, float distance, out Matrix4x4 mat)
         {
             var tgt = GetBlendshapeCenter(blendshape);
-            tgt.z += 0.005f;
-            var offset = tgt + normal.normalized * distance;
+            tgt += AvatarToWorldVector(new Vector3(0, 0, 0.005f));
+            var offset = tgt + AvatarToWorldDirection(normal) * distance;
             var hit = RaycastTarget(tgt, offset);
             mat = Matrix4x4.identity;
             if (hit == null) return false;
-            mat = Matrix4x4.TRS((Vector3)hit, Quaternion.FromToRotation(Vector3.forward, normal), Vector3.one);
+            mat = Matrix4x4.TRS((Vector3)hit, AvatarLookRotation(normal), Vector3.one);
             return true;
         }
 
@@ -321,30 +366,10 @@ namespace Wholesome
             pos = Vector3.zero;
             var tgt = GetBlendshapeCenter(blendshape);
             // tgt.z += 0.005f;
-            var offset = tgt + normal.normalized * distance;
+            var offset = tgt + AvatarToWorldDirection(normal) * distance;
             var hit = RaycastTarget(tgt, offset);
             if (hit == null) return false;
             pos = (Vector3)hit;
-            return true;
-        }
-
-        const float RAYCAST_OFFSET = 0.003f;
-        public bool RaycastAroundToBlendshape(string blendshape, Vector3 normal, float distance, Axis axis, out Vector3 pos)
-        {
-            pos = Vector3.zero;
-            var tgt = GetBlendshapeCenter(blendshape);
-            // tgt.z += 0.005f;
-            var offset = tgt + normal.normalized * distance;
-            tgt[(int)axis] += RAYCAST_OFFSET;
-            offset[(int)axis] += RAYCAST_OFFSET;
-            
-            var hit1 = RaycastTarget(tgt, offset);
-            tgt[(int)axis] -= 2*RAYCAST_OFFSET;
-            offset[(int)axis] -= 2*RAYCAST_OFFSET;
-            var hit2 = RaycastTarget(tgt, offset);
-
-            if (hit1 == null || hit2 == null) return false;
-            pos = ((Vector3)hit1 + (Vector3)hit2) / 2;
             return true;
         }
 
@@ -352,15 +377,20 @@ namespace Wholesome
         {
             var bone = FuryUtils.GetBone(avatarObject, humanBone);
             var bonePosition = bone.transform.position;
+            var bonePositionLocal = WorldToAvatarPoint(bonePosition);
+            var dirLocal = dir.sqrMagnitude > Mathf.Epsilon ? dir.normalized : Vector3.up;
             var boneIdx = Array.IndexOf(renderer.bones, bone.transform);
             var mesh = renderer.sharedMesh;
             var bonesPerVertex = mesh.GetBonesPerVertex();
             var boneWeights = mesh.GetAllBoneWeights();
-            var verts = mesh.vertices;
+            var positionMesh = GetPositionMesh(mesh);
+            var verts = positionMesh.vertices;
 
             var vIdx = 0;
             var boneArrayIdx = 0;
-            var minY = float.MaxValue;
+            var bestProjection = float.MaxValue;
+            var bestPosLocal = bonePositionLocal;
+            var found = false;
             foreach (var bonesCount in bonesPerVertex)
             {
                 for (var i = 0; i < bonesCount; i++)
@@ -370,15 +400,29 @@ namespace Wholesome
                     {
                         var pos = verts[vIdx];
                         var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
-                        var diff = bonePosition - posWorld;
-                        if (posWorld.y < minY && Math.Abs(diff.x) < 0.01 && Math.Abs(diff.z) < 0.01) minY = posWorld.y;
+                        var posLocal = WorldToAvatarPoint(posWorld);
+                        var diffLocal = bonePositionLocal - posLocal;
+                        var perpendicular = diffLocal - Vector3.Project(diffLocal, dirLocal);
+                        var projection = Vector3.Dot(posLocal, dirLocal);
+                        if (projection < bestProjection && perpendicular.magnitude < 0.01f)
+                        {
+                            bestProjection = projection;
+                            bestPosLocal = posLocal;
+                            found = true;
+                        }
                     }
                     boneArrayIdx++;
                 }
                 vIdx++;
             }
 
-            return Matrix4x4.TRS(new Vector3(bonePosition.x, minY, bonePosition.z), Quaternion.LookRotation(Vector3.down), Vector3.one);
+            var resultLocal = bonePositionLocal;
+            if (found)
+            {
+                var along = Vector3.Dot(bestPosLocal - bonePositionLocal, dirLocal);
+                resultLocal = bonePositionLocal + dirLocal * along;
+            }
+            return Matrix4x4.TRS(AvatarToWorldPoint(resultLocal), AvatarLookRotation(-dirLocal, Vector3.forward), Vector3.one);
             // return Matrix4x4.TRS(p, q, Vector3.one);
         }
 
@@ -394,13 +438,13 @@ namespace Wholesome
                 allButCurrentHumanBones.Add(t);
             }
 
-            var boneIdces = new List<int>();
+            var boneIdces = new HashSet<int>();
             void traverse(Transform transform)
             {
                 if (allButCurrentHumanBones.Contains(transform)) return;
                 var boneIdx = Array.IndexOf(renderer.bones, transform);
 
-                boneIdces.Add(boneIdx);
+                if (boneIdx >= 0) boneIdces.Add(boneIdx);
                 foreach (Transform t in transform)
                 {
                     traverse(t);
@@ -411,38 +455,53 @@ namespace Wholesome
             var mesh = renderer.sharedMesh;
             var bonesPerVertex = mesh.GetBonesPerVertex();
             var boneWeights = mesh.GetAllBoneWeights();
-            var verts = mesh.vertices;
+            var positionMesh = GetPositionMesh(mesh);
+            var verts = positionMesh.vertices;
 
-            var maxPos = Vector3.zero;
-            maxPos[(int)axis] = sign > 0 ? float.MinValue : float.MaxValue;
-            //TODO: SET MAX POS CORRECTLY
-
-            var vIdx = 0;
-            var boneArrayIdx = 0;
-            foreach (var bonesCount in bonesPerVertex)
+            bool TryGetBest(bool useSideFilter, out Vector3 maxPos)
             {
-                var pos = verts[vIdx];
-                var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
+                maxPos = bonePosition;
+                var bestAxisValue = sign > 0 ? float.MinValue : float.MaxValue;
+                var found = false;
 
-                vIdx++;
-
-                var totalWeight = 0f;
-
-                for (var i = 0; i < bonesCount; i++)
+                var vIdx = 0;
+                var boneArrayIdx = 0;
+                foreach (var bonesCount in bonesPerVertex)
                 {
-                    var bw = boneWeights[boneArrayIdx];
-                    boneArrayIdx++;
-                    if (xSide == 1 && posWorld.x < 0) continue;
-                    if (xSide == -1 && posWorld.x > 0) continue;
-                    if (!boneIdces.Contains(bw.boneIndex)) continue;
-                    totalWeight += bw.weight;
+                    var pos = verts[vIdx];
+                    var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
+                    var posLocal = WorldToAvatarPoint(posWorld);
 
+                    vIdx++;
+
+                    var totalWeight = 0f;
+                    for (var i = 0; i < bonesCount; i++)
+                    {
+                        var bw = boneWeights[boneArrayIdx];
+                        boneArrayIdx++;
+                        if (!boneIdces.Contains(bw.boneIndex)) continue;
+                        totalWeight += bw.weight;
+                    }
+                    if (totalWeight < weightThreshold) continue;
+                    if (useSideFilter && xSide > 0 && posLocal.x < 0) continue;
+                    if (useSideFilter && xSide < 0 && posLocal.x > 0) continue;
+
+                    var axisValue = posLocal[(int)axis];
+                    if (!found || (sign > 0 ? axisValue > bestAxisValue : axisValue < bestAxisValue))
+                    {
+                        bestAxisValue = axisValue;
+                        maxPos = posWorld;
+                        found = true;
+                    }
                 }
-                if (totalWeight < weightThreshold) continue;
-                if (sign > 0 ? posWorld[(int)axis] > maxPos[(int)axis] : posWorld[(int)axis] < maxPos[(int)axis]) maxPos = posWorld;
+
+                return found;
             }
 
-            return maxPos;
+            var useSide = Mathf.Abs(xSide) > Mathf.Epsilon;
+            if (TryGetBest(useSide, out var result)) return result;
+            if (useSide && TryGetBest(false, out result)) return result;
+            return bonePosition;
         }
 
         // public Vector3 GetMaxPosInDirAroundRadius(Matrix4x4 mat, Axis axis, float sign, float maxDistance)
@@ -511,8 +570,8 @@ namespace Wholesome
         public Vector3? GetVagina()
         {
             var hip = FuryUtils.GetBone(avatarObject, HumanBodyBones.Hips).transform;
-            var origin = hip.position + new Vector3(0, -0.05f, 0);
-            var direction = Vector3.up;
+            var origin = hip.position + AvatarToWorldVector(new Vector3(0, -0.05f, 0));
+            var direction = AvatarToWorldDirection(Vector3.up);
             var hit = Raycast(origin, origin + direction);
             return hit?.point;
         }
@@ -574,8 +633,10 @@ namespace Wholesome
             var mesh = renderer.sharedMesh;
             var bonesPerVertex = mesh.GetBonesPerVertex();
             var boneWeights = mesh.GetAllBoneWeights();
-            var verts = mesh.vertices;
-            var normals = mesh.normals;
+            var positionMesh = GetPositionMesh(mesh);
+            var verts = positionMesh.vertices;
+            var normals = GetPositionNormals(positionMesh, mesh);
+            if (normals.Length != mesh.vertexCount) return (bonePosition, normal.normalized);
 
 
             var vList = new List<Vector3>();
@@ -647,25 +708,28 @@ namespace Wholesome
 
         public Vector3 GetAABBCenter(HumanBodyBones human)
         {
-            var xMin = GetMaxPosInAxis(human, Axis.X, -1);
-            var xMax = GetMaxPosInAxis(human, Axis.X, 1);
-            var yMin = GetMaxPosInAxis(human, Axis.Y, -1);
-            var yMax = GetMaxPosInAxis(human, Axis.Y, 1);
-            var zMin = GetMaxPosInAxis(human, Axis.Z, -1);
-            var zMax = GetMaxPosInAxis(human, Axis.Z, 1);
+            var xMin = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.X, -1));
+            var xMax = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.X, 1));
+            var yMin = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.Y, -1));
+            var yMax = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.Y, 1));
+            var zMin = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.Z, -1));
+            var zMax = WorldToAvatarPoint(GetMaxPosInAxis(human, Axis.Z, 1));
             float midX = (xMin.x + xMax.x) * 0.5f;
             float midY = (yMin.y + yMax.y) * 0.5f;
             float midZ = (zMin.z + zMax.z) * 0.5f;
-            return new Vector3(midX, midY, midZ);
+            return AvatarToWorldPoint(new Vector3(midX, midY, midZ));
         }
 
         public Vector3 GetAvgNormalCloseToPoint(Vector3 point, Vector3 normal, float angleThreshold, float maxDistance)
         {
-            var verts = renderer.sharedMesh.vertices;
-            var normals = renderer.sharedMesh.normals;
+            var mesh = renderer.sharedMesh;
+            var positionMesh = GetPositionMesh(mesh);
+            var verts = positionMesh.vertices;
+            var normals = GetPositionNormals(positionMesh, mesh);
+            if (normals.Length != mesh.vertexCount) return normal.normalized;
             var normalSum = Vector3.zero;
             var count = 0;
-            for (var i = 0; i < renderer.sharedMesh.vertexCount; i++)
+            for (var i = 0; i < mesh.vertexCount; i++)
             {
                 var pos = verts[i];
                 var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
@@ -678,6 +742,7 @@ namespace Wholesome
                 normalSum += nWorld;
                 count++;
             }
+            if (count == 0) return normal.normalized;
             var normalAvg = normalSum / count;
             return normalAvg.normalized;
         }
