@@ -18,12 +18,14 @@ namespace Wholesome
         private Mesh bakedMesh;
         private Mesh raycastProxyMesh;
         private bool ownsRaycastProxyMesh;
+        private Matrix4x4 bakedMeshToWorldMatrix;
 
         public Locator(GameObject avatarObject, SkinnedMeshRenderer renderer)
         {
             this.avatarObject = avatarObject;
             this.renderer = renderer;
             bakedMesh = BuildBakedMesh(renderer);
+            bakedMeshToWorldMatrix = GetBakedMeshToWorldMatrix(renderer);
             raycastProxyMesh = BuildRaycastProxyMesh(bakedMesh, out ownsRaycastProxyMesh);
             this.humanToBone = new Dictionary<HumanBodyBones, Transform>();
             var humans = Enum.GetValues(typeof(HumanBodyBones));
@@ -129,7 +131,7 @@ namespace Wholesome
 
             var hit = MeshRaycaster.Raycast(
                 raycastProxyMesh,
-                renderer.localToWorldMatrix,
+                bakedMeshToWorldMatrix,
                 new Ray(origin, direction),
                 out var hitPoint,
                 out var hitNormal,
@@ -155,7 +157,7 @@ namespace Wholesome
 
             var res = MeshRaycaster.Raycast(
                 raycastProxyMesh,
-                renderer.localToWorldMatrix,
+                bakedMeshToWorldMatrix,
                 new Ray(origin, direction),
                 out var hitPoint,
                 out var hitNormal,
@@ -176,6 +178,18 @@ namespace Wholesome
             };
             renderer.BakeMesh(mesh);
             return mesh;
+        }
+
+        private static Matrix4x4 GetBakedMeshToWorldMatrix(SkinnedMeshRenderer renderer)
+        {
+            if (renderer != null &&
+                renderer.sharedMesh != null &&
+                renderer.sharedMesh.boneWeights.Length > 0)
+            {
+                return Matrix4x4.TRS(renderer.transform.position, renderer.transform.rotation, Vector3.one);
+            }
+
+            return renderer != null ? renderer.localToWorldMatrix : Matrix4x4.identity;
         }
 
         private static Mesh BuildRaycastProxyMesh(Mesh bakedMesh, out bool ownsMesh)
@@ -345,7 +359,7 @@ namespace Wholesome
             var weights = magnitudes.Select(mag => mag / sum).ToArray();
             var weightedPos = positionMesh.vertices.Zip(weights, (pos, weight) => pos * weight)
                 .Aggregate(new Vector3(), (wpSum, wp) => wpSum + wp, (wp) => wp);
-            var weightedPosWorld = renderer.localToWorldMatrix.MultiplyPoint(weightedPos);
+            var weightedPosWorld = bakedMeshToWorldMatrix.MultiplyPoint(weightedPos);
             return weightedPosWorld;
         }
 
@@ -399,7 +413,7 @@ namespace Wholesome
                     if (bw.boneIndex == boneIdx && bw.weight > 0.7)
                     {
                         var pos = verts[vIdx];
-                        var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
+                        var posWorld = bakedMeshToWorldMatrix.MultiplyPoint(pos);
                         var posLocal = WorldToAvatarPoint(posWorld);
                         var diffLocal = bonePositionLocal - posLocal;
                         var perpendicular = diffLocal - Vector3.Project(diffLocal, dirLocal);
@@ -469,7 +483,7 @@ namespace Wholesome
                 foreach (var bonesCount in bonesPerVertex)
                 {
                     var pos = verts[vIdx];
-                    var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
+                    var posWorld = bakedMeshToWorldMatrix.MultiplyPoint(pos);
                     var posLocal = WorldToAvatarPoint(posWorld);
 
                     vIdx++;
@@ -583,24 +597,40 @@ namespace Wholesome
 
         public static (Axis, float) GetDominantAxisInDir(Vector3 axis, Matrix4x4 worldMat)
         {
-            var sec = -1;
-            var diff = float.MaxValue;
+            var axisDirection = NormalizeOrZero(axis);
+            if (axisDirection.sqrMagnitude <= Mathf.Epsilon) return (Axis.X, 1);
+
+            var sec = 0;
+            var bestDot = float.MinValue;
             var res = 0f;
             for (var i = 0; i < 3; i++)
             {
-                var row = worldMat.GetColumn(i);
-                var res1 = Vector3.Dot(axis, new Vector3(row.x, row.y, row.z));
-                var diff1 = 1 - Math.Abs(res1);
-                if (diff1 < diff)
+                var column = GetNormalizedAxis(worldMat, (Axis)i);
+                if (column.sqrMagnitude <= Mathf.Epsilon) continue;
+
+                var res1 = Vector3.Dot(axisDirection, column);
+                var dot = Math.Abs(res1);
+                if (dot > bestDot)
                 {
                     sec = i;
-                    diff = diff1;
+                    bestDot = dot;
                     res = res1;
                 }
             }
-            var sign = res > 0 ? 1 : -1;
+            var sign = res >= 0 ? 1 : -1;
             return ((Axis)sec, sign);
             // return sec;
+        }
+
+        internal static Vector3 GetNormalizedAxis(Matrix4x4 matrix, Axis axis)
+        {
+            var column = matrix.GetColumn((int)axis);
+            return NormalizeOrZero(new Vector3(column.x, column.y, column.z));
+        }
+
+        private static Vector3 NormalizeOrZero(Vector3 vector)
+        {
+            return vector.sqrMagnitude > Mathf.Epsilon ? vector.normalized : Vector3.zero;
         }
 
         // TODO: get avg. normal dir
@@ -654,8 +684,8 @@ namespace Wholesome
                     {
                         var pos = verts[vIdx];
                         var vNormal = normals[vIdx];
-                        var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
-                        var vNormalWorld = renderer.localToWorldMatrix.MultiplyVector(vNormal);
+                        var posWorld = bakedMeshToWorldMatrix.MultiplyPoint(pos);
+                        var vNormalWorld = bakedMeshToWorldMatrix.MultiplyVector(vNormal);
                         var rad = Math.Acos(Vector3.Dot(vNormalWorld, normal));
                         var deg = rad * (180 / Math.PI);
                         if (deg < angleThreshold)
@@ -732,9 +762,9 @@ namespace Wholesome
             for (var i = 0; i < mesh.vertexCount; i++)
             {
                 var pos = verts[i];
-                var posWorld = renderer.localToWorldMatrix.MultiplyPoint(pos);
+                var posWorld = bakedMeshToWorldMatrix.MultiplyPoint(pos);
                 var n = normals[i];
-                var nWorld = renderer.localToWorldMatrix.MultiplyVector(n);
+                var nWorld = bakedMeshToWorldMatrix.MultiplyVector(n);
                 var dist = Vector3.Distance(posWorld, point);
                 if (dist > maxDistance) continue;
                 var deg = Vector3.Angle(nWorld, normal);

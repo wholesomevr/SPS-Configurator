@@ -410,12 +410,19 @@ namespace Wholesome
                         var secAxis = Locator.GetDominantAxisInDir(dir * -1, worldMat);
 
                         // var zCol = worldMat.GetColumn((int)zAxis.Item1) * zAxis.Item2;
-                        var zCol = (Vector4)AvatarDirection(Vector3.back);
-                        var xCol = worldMat.GetColumn((int)secAxis.Item1) * secAxis.Item2;
-                        var yCol = (Vector4)Vector3.Cross((Vector3)zCol, (Vector3)xCol);
+                        var zAxis = AvatarDirection(Vector3.back);
+                        var xAxis = Locator.GetNormalizedAxis(worldMat, secAxis.Item1) * secAxis.Item2;
+                        if (xAxis.sqrMagnitude <= Mathf.Epsilon) xAxis = AvatarDirection(Vector3.right);
+                        var yAxis = Vector3.Cross(zAxis, xAxis).normalized;
+                        if (yAxis.sqrMagnitude <= Mathf.Epsilon) yAxis = AvatarDirection(Vector3.up);
+                        xAxis = Vector3.Cross(yAxis, zAxis).normalized;
+                        if (xAxis.sqrMagnitude <= Mathf.Epsilon) xAxis = Locator.GetNormalizedAxis(worldMat, secAxis.Item1) * secAxis.Item2;
+                        var zCol = (Vector4)zAxis;
+                        var xCol = (Vector4)xAxis;
+                        var yCol = (Vector4)yAxis;
                         // TODO: Check if basis is perpedicualr
 
-                        var ySign = Vector3.Dot((Vector3)yCol, AvatarDirection(Vector3.up)) > 0 ? 1 : -1;
+                        var ySign = Vector3.Dot(yAxis, AvatarDirection(Vector3.up)) > 0 ? 1 : -1;
                         // Math.Sign()
                         var trans = new Vector4(center.x, center.y, center.z, 1);
                         var mat = new Matrix4x4(xCol, yCol, zCol, trans);
